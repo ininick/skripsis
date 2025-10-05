@@ -1,0 +1,10 @@
+Bikin kernel dlu ya, pake venv, pastiin dah ada python
+
+** cli: python--version
+** change directory sampe ke folder skripsis 
+** python -m venv skripsis
+** skripsis/Scripts/activate
+** python -m ipykernel install --user --name=skripsis
+** pip install -r requirements_backup.txt
+
+gaskan crot crot kernel
