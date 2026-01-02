@@ -8,3 +8,29 @@ Bikin kernel dlu ya, pake venv, pastiin dah ada python
 ** pip install -r requirements_backup.txt
 
 gaskan crot crot kernel
+
+/////URUSAN PER GIT GIT AN///////////
+git init
+
+# Tambahkan file ke staging area
+git add .
+
+# Commit perubahan
+git commit -m "Initial commit"
+
+# Buat branch baru (misal: feature/new-feature)
+git branch feature/new-feature
+
+# Pindah ke branch baru
+git checkout feature/new-feature
+
+# Lakukan perubahan pada kode
+
+# Tambahkan file ke staging area
+git add .
+
+# Commit perubahan
+git commit -m "Tambahkan fitur baru"
+
+# Push branch ke remote repository (misal: origin)
+git push -u origin feature/new-feature
