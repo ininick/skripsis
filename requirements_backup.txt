@@ -23,7 +23,6 @@ Sastrawi
 transformers
 gensim
 pyLDAvis
-statsmodelsvs
 arch
 tqdm
 Pillow
