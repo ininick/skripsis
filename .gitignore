@@ -1,6 +1,6 @@
 model/
 skripsis_venv/
-skripsis_venv/
+skripsis/
 .ipynb_checkpoints/
 __pycache__/
 *.pyc
