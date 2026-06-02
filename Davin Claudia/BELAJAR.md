@@ -336,5 +336,100 @@ loss = ce_loss * class_weights  # keduanya di GPU → AMAN! ✅
 
 ---
 
+---
+
+## SESI 6: FOCAL LOSS — DETAIL
+
+### Masalah yang belum terselesaikan sama class weight
+
+Meski class weight sudah ada, masih ada masalah:
+```
+13.000 artikel Netral → banyak yang MUDAH diprediksi
+→ Model sudah yakin & benar untuk artikel-artikel ini
+→ Tapi tetap mempengaruhi training dan buang waktu!
+```
+
+### Cara Kerja Focal Loss
+
+```python
+# Di code:
+pt = torch.exp(-ce_loss)        # seberapa yakin model
+focal_loss = ((1 - pt) ** 2.0 * ce_loss).mean()
+```
+
+**pt = seberapa yakin model terhadap jawaban yang benar**
+```
+Model yakin & benar  → pt TINGGI (0.90)
+Model salah/ragu     → pt RENDAH (0.08)
+```
+
+**`(1 - pt)^2` = pengatur volume:**
+```
+Artikel MUDAH (pt=0.90): (1-0.90)^2 = 0.01 → loss × 0.01 = diabaikan! 🔇
+Artikel SUSAH (pt=0.08): (1-0.08)^2 = 0.85 → loss × 0.85 = diperhatiin! 🔊
+```
+
+### Kenapa gamma = 2.0?
+```
+gamma = 0.0 → sama aja CE biasa, tidak ada efek
+gamma = 1.0 → efek ringan
+gamma = 2.0 → OPTIMAL (dari paper Lin et al. 2020) ✅
+gamma = 3.0 → terlalu agresif, overfitting
+```
+Dibuktikan dengan ablation study — gamma 2.0 menghasilkan macro F1 dan F1 kelas minoritas tertinggi.
+
+### Gabungan Class Weight + Focal Loss
+```
+Artikel Negatif SUSAH:
+① class weight : loss × 2.64
+② focal weight : × 0.85
+FINAL           : loss × 2.24  ← double boost!
+
+Artikel Netral MUDAH:
+① class weight : loss × 0.59
+② focal weight : × 0.01
+FINAL           : loss × 0.006 ← nyaris nol!
+```
+
+### Contoh artikel MUDAH vs SUSAH
+
+| Tipe | Contoh | Kenapa |
+|---|---|---|
+| Netral MUDAH | "Rapat kabinet membahas RAPBN hari ini" | Fakta polos, tidak ada kata emosional |
+| Positif MUDAH | "Presiden umumkan kenaikan gaji karyawan" | Jelas positif, tidak ambigu |
+| Negatif MUDAH | "Perang telah terjadi di Indonesia Timur" | Jelas negatif, kata 'perang' kuat |
+| Negatif SUSAH | "Korupsi telah terjadi di Polri, namun presiden berkata kasus harus diusut tuntas" | Sinyal campur: korupsi (negatif) vs usut tuntas (positif) |
+
+### Kenapa butuh KOMBINASI class weight + focal loss?
+
+```
+Class Weight = "SIAPA yang harus diperhatiin?"
+               → Kelas Negatif & Positif dapat bobot lebih besar
+
+Focal Loss   = "ARTIKEL MANA yang harus diperhatiin?"
+               → Artikel susah dapat perhatian lebih
+               → Artikel mudah diabaikan
+```
+
+**Analogi:**
+```
+Class Weight = guru kasih PR lebih banyak ke murid yang lemah
+Focal Loss   = guru fokus ngajarin soal yang susah, skip yang mudah
+```
+
+Tanpa class weight → model anggap enteng Negatif & Positif
+Tanpa focal loss → model buang waktu di artikel Netral yang mudah
+
+✅ **Yang dipakai:** Class weight balanced × 1.5 + Focal Loss gamma=2.0
+❌ **Alternatif:**
+- CE biasa → bias ke Netral
+- Class weight saja → masih buang waktu di artikel mudah
+- Focal loss saja → kelas minoritas masih kurang dapat perhatian
+
+🎤 **Jawab dosen (versi kamu sendiri — sudah bagus!):**
+> *"Kami menggunakan kombinasi class weight dan focal loss untuk mengatasi class imbalance. Class weight memberikan bobot lebih besar pada kelas Negatif dan Positif karena jumlah datanya hampir setengah dari kelas Netral — selisihnya hampir 2x lipat. Sementara focal loss memastikan model tidak membuang waktu pada artikel yang sudah mudah diprediksi, sehingga training lebih fokus pada artikel yang sulit dan ambigu. Kombinasi keduanya memberikan double boost untuk kelas minoritas."*
+
+---
+
 *Dokumen ini terus diupdate setiap sesi belajar.*
 *Last updated: 2 Juni 2026*
