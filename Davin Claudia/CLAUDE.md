@@ -4,6 +4,101 @@
 
 ---
 
+# 🎯 PROGRESS LENGKAP SKRIPSI — STATE SAAT INI
+
+> Dibaca dulu kalau pindah window/context baru.
+
+## Status 6 Model Arsitektur
+
+| Model | Macro F1 | Accuracy | Status | Lokasi Model |
+|---|---|---|---|---|
+| **IndoBERT + GRU** | **82.45%** | **83.51%** | ✅ SELESAI | `C:\Users\Davin\Downloads\gru_output\gru_best\model.safetensors` (485 MB) |
+| **IndoBERT + CNN** | **82.55%** | **83.55%** | ✅ SELESAI | `C:\Users\Davin\Downloads\cnn_output\cnn_best\model_state_dict.pt` (479 MB) |
+| IndoBERT + XGBoost | - | - | 🔄 Running di Kaggle nicolnicol | TBD |
+| IndoBERT + BiLSTM | - | - | ⏳ Belum push | TBD |
+| IndoBERT Fine-Tuned | - | - | ⏳ Belum push | TBD |
+| IndoBERT + RFC | - | - | ⏳ Belum push | TBD |
+
+### Hasil Detail GRU:
+- Accuracy: 0.8351 | Macro F1: 0.8245 | Weighted F1: 0.8354
+- F1-Neg: 0.8021 | F1-Neu: 0.8545 | F1-Pos: 0.8170
+
+### Hasil Detail CNN:
+- Accuracy: 0.8355 | Macro F1: 0.8255 | Weighted F1: 0.8359
+- F1-Neg: 0.7998 | F1-Neu: 0.8533 | F1-Pos: 0.8233
+
+---
+
+## 🔑 API Tokens Kaggle
+
+| Akun | Token | Status |
+|---|---|---|
+| davinraffilio9 (Davin) | `KGAT_e89aba9eae0a83a0d78fdff4e01d2a35` | Quota habis, reset Senin |
+| nicolnicol (teman) | `KGAT_3b5e4e2b8b5106b09a3c56bf7294d997` | Aktif untuk CNN & XGBoost |
+
+### Kaggle Kernels:
+- `davinraffilio9/revisi-fix-indobert-gru` — ✅ Selesai
+- `nicolnicol/revision-of-cnn-tok` — ✅ Selesai (CANCELED setelah save)
+- `nicolnicol/revision-indobert-xgboost` — 🔄 Running manual T4
+
+### Cara Cek & Download:
+```powershell
+$env:PYTHONUTF8 = "1"
+$env:KAGGLE_API_TOKEN = "KGAT_3b5e4e2b8b5106b09a3c56bf7294d997"
+kaggle kernels status nicolnicol/revision-indobert-xgboost
+kaggle kernels output nicolnicol/revision-indobert-xgboost -p "C:\Users\Davin\Downloads\xgboost_output"
+```
+
+---
+
+## 📁 File Penting
+
+### Repo GitHub `ininick/skripsis`:
+```
+skripsis/
+├── Davin Claudia/
+│   ├── CLAUDE.md     ← FILE INI (progress + panduan sidang)
+│   └── BELAJAR.md    ← materi pembelajaran sesi by sesi
+├── MODEL/
+│   ├── README.md, GRU/, CNN/
+└── revision/
+    ├── GRU/, CNN/, XGBoost/ (pushed)
+    └── BiLSTM/, IndoBERT-FineTuned/, RFC/ (belum push)
+```
+
+### File di Downloads:
+- `Panduan_Sidang_Skripsi_Davin.pdf` — panduan sidang lengkap
+- `Panduan_Cell_per_Cell_Notebook.pdf` — penjelasan tiap cell GRU & CNN
+- `Revised_Paper_IEEE_XX.docx` — paper revisi IEEE format, placeholder `[XX]` kuning
+- `gru_output/` (485 MB), `cnn_output/` (479 MB)
+
+---
+
+## 💡 Cara Davin Mau Diajarin (PENTING untuk agent baru!)
+
+- **Pelan-pelan**, jangan langsung teknis
+- **Banyak contoh konkret** bahasa Indonesia (artikel politik)
+- **Before vs After** kalau bisa
+- **Analogi sehari-hari** (sticky note, gedung lantai, dapur, lampu)
+- **Sebutkan alternatif** yang tidak dipakai + alasannya (antisipasi dosen)
+- **Kasih jawaban siap pakai buat sidang** dalam bahasa formal
+- **Cecar dengan pertanyaan balik** setelah jelasin (latihan sidang)
+- Catat progress di **BELAJAR.md** secara berkala
+- Pakai bahasa **santai/ngobrol**, jangan kaku
+
+---
+
+## 🚀 Next Step
+
+1. Cek status XGBoost di Kaggle
+2. Kalau selesai → download output
+3. Lanjut belajar dari **Cell 14-15 (FocalLossTrainer & compute_metrics)**
+4. Sambil tunggu, bisa push BiLSTM/IndoBERT-FT/RFC ke Kaggle teman
+
+---
+
+# 📚 PANDUAN SIDANG (Detail Materi)
+
 ## DAFTAR ISI
 1. [Gambaran Umum Skripsi](#1-gambaran-umum-skripsi)
 2. [Dataset](#2-dataset)
