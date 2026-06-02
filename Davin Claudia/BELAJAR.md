@@ -927,5 +927,237 @@ Inilah kelebihan BERT vs Word2Vec/GloVe — **representasi kontekstual**, bukan 
 
 ---
 
+---
+
+# 📋 PROGRESS LENGKAP SKRIPSI — STATE SAAT INI
+
+> Dokumen ini wajib dibaca dulu kalau pindah window/context baru.
+> Tanggal sidang: **15 Juni 2026**
+
+---
+
+## 🎯 STATUS MODEL — 6 ARSITEKTUR
+
+| Model | Macro F1 | Accuracy | Status | Lokasi Model |
+|---|---|---|---|---|
+| **IndoBERT + GRU** | **82.45%** | **83.51%** | ✅ SELESAI | `C:\Users\Davin\Downloads\gru_output\gru_best\model.safetensors` (485 MB) |
+| **IndoBERT + CNN** | **82.55%** | **83.55%** | ✅ SELESAI | `C:\Users\Davin\Downloads\cnn_output\cnn_best\model_state_dict.pt` (479 MB) |
+| IndoBERT + XGBoost | - | - | 🔄 Running di Kaggle nicolnicol | TBD |
+| IndoBERT + BiLSTM | - | - | ⏳ Belum push | TBD |
+| IndoBERT Fine-Tuned | - | - | ⏳ Belum push | TBD |
+| IndoBERT + RFC | - | - | ⏳ Belum push | TBD |
+
+### Hasil Detail GRU:
+- Accuracy: 0.8351
+- Macro F1: 0.8245
+- Weighted F1: 0.8354
+- F1-Negative: 0.8021
+- F1-Neutral: 0.8545
+- F1-Positive: 0.8170
+
+### Hasil Detail CNN:
+- Accuracy: 0.8355
+- Macro F1: 0.8255
+- Weighted F1: 0.8359
+- F1-Negative: 0.7998
+- F1-Neutral: 0.8533
+- F1-Positive: 0.8233
+
+---
+
+## 🔑 API TOKENS KAGGLE
+
+| Akun | Token | Status |
+|---|---|---|
+| davinraffilio9 (kamu) | `KGAT_e89aba9eae0a83a0d78fdff4e01d2a35` | Quota habis, reset Senin |
+| nicolnicol (teman) | `KGAT_3b5e4e2b8b5106b09a3c56bf7294d997` | Aktif, dipakai untuk CNN & XGBoost |
+
+### Kaggle Kernels:
+- `davinraffilio9/revisi-fix-indobert-gru` — ✅ Selesai (GRU)
+- `nicolnicol/revision-of-cnn-tok` — ✅ Selesai (CNN), CANCELED
+- `nicolnicol/revision-indobert-xgboost` — 🔄 Running (kamu run manual T4)
+
+### Cara Cek Status:
+```powershell
+$env:PYTHONUTF8 = "1"
+$env:KAGGLE_API_TOKEN = "KGAT_3b5e4e2b8b5106b09a3c56bf7294d997"
+kaggle kernels status nicolnicol/revision-indobert-xgboost
+```
+
+### Cara Download Output:
+```powershell
+kaggle kernels output nicolnicol/revision-indobert-xgboost -p "C:\Users\Davin\Downloads\xgboost_output"
+```
+
+---
+
+## 📁 FILE PENTING
+
+### Repo GitHub: `ininick/skripsis`
+```
+skripsis/
+├── Davin Claudia/
+│   ├── CLAUDE.md          ← panduan sidang lengkap
+│   └── BELAJAR.md          ← FILE INI (catatan sesi belajar)
+├── MODEL/
+│   ├── README.md           ← status model + cara load
+│   ├── GRU/                ← metadata GRU (tokenizer config + summary)
+│   └── CNN/                ← metadata CNN (tokenizer config)
+└── revision/
+    ├── GRU/                 ← revisi-fix-indobert-gru.ipynb
+    ├── CNN/                 ← indobert-cnn-political-news.ipynb
+    ├── XGBoost/             ← indobert-xgboost.ipynb
+    ├── BiLSTM/              ← (belum push ke Kaggle)
+    ├── IndoBERT-FineTuned/  ← (belum push)
+    └── RFC/                 ← (belum push)
+```
+
+### File di Downloads:
+- `Panduan_Sidang_Skripsi_Davin.pdf` — panduan sidang lengkap (BAB 6 revisi reviewer detail)
+- `Panduan_Cell_per_Cell_Notebook.pdf` — penjelasan tiap cell GRU & CNN
+- `Revised_Paper_IEEE_XX.docx` — paper revisi format IEEE dengan placeholder kuning `[XX]`
+- `gru_output/` — model GRU (485 MB)
+- `cnn_output/` — model CNN (479 MB)
+
+---
+
+## 📊 DATASET
+
+**Source:** Kaggle dataset `davinraffilio9/datalabeled`  
+**Path Kaggle:** `/kaggle/input/datasets/davinraffilio9/datalabeled`
+
+| File | Jumlah Artikel |
+|---|---|
+| `cnbc_labeled.csv` | 9.999 |
+| `detik_labeled.csv` | 5.343 |
+| `kompas_labeled.csv` | 9.980 |
+| **TOTAL** | **25.322** |
+
+**Split:** 80:20 stratified
+- Train: 20.257 artikel
+- Val: 5.065 artikel
+
+**Distribusi:**
+- Negatif: 4.792 (18.9%) — minoritas
+- Netral: 14.358 (56.7%) — mayoritas
+- Positif: 6.172 (24.4%)
+
+---
+
+## ⚙️ HYPERPARAMETER UTAMA
+
+| Parameter | Nilai | Catatan |
+|---|---|---|
+| SEED | 42 | Reproducibility |
+| MODEL_NAME | indobenchmark/indobert-base-p1 | IndoBERT base phase 1 |
+| MAX_LENGTH | 512 | Hard limit BERT |
+| GRU_HIDDEN | 256 | Dari ablation study |
+| GRU_LAYERS | 2 | Layer GRU |
+| DROPOUT | 0.2 | Regularisasi |
+| Learning Rate | 3e-5 | Standar fine-tuning BERT |
+| Batch Size (per device) | 16 | Train & eval |
+| Gradient Accumulation | 2 steps | Effective batch = 32 |
+| Epochs | 15 (max) | + early stopping patience=3 |
+| LR Scheduler | Cosine | Smooth decay |
+| Warmup Ratio | 0.1 | 10% pertama |
+| Weight Decay | 0.01 | L2 regularisasi |
+| fp16 | True | Mixed precision |
+| Focal Loss gamma | 2.0 | Atasi imbalance |
+| Class Weights | [2.64, 0.59, 2.05] | Balanced × [1.5, 1.0, 1.5] |
+
+---
+
+## 🎤 REVISI REVIEWER ICISS — 4 POIN
+
+### R1: Ablation Study
+**Komentar:** "Choices like hidden_size=256, bidirectional, kernel_sizes [3,4,5] need empirical justification."
+
+**Fix:** 3-4 ablation per model
+- GRU/BiLSTM: hidden size (128/256/384), uni vs bi, focal gamma (0/1/2/3)
+- CNN: kernel sizes, num filters (64/128/256), pooling (max/avg/k-max)
+
+### R2: Cross Validation
+**Komentar:** "Single split insufficient — high variance, unclear generalization."
+
+**Fix:** Stratified 5-Fold CV semua model, report mean ± std
+
+### R3: Explainable AI (XAI)
+**Komentar:** "Black-box models need interpretability for political domain."
+
+**Fix:** 
+- DL models → Integrated Gradients (Captum)
+- XGBoost/RFC → SHAP TreeExplainer
+
+### R4: Statistical Significance
+**Komentar:** "Difference of 0.0092 could be random — need statistical tests."
+
+**Fix:**
+- Bootstrap CI 95% (n=1000)
+- McNemar Test antara GRU (best) vs model lain
+
+---
+
+## 📚 PROGRESS BELAJAR — APA SAJA YANG SUDAH DIBAHAS
+
+### ✅ Sudah Selesai (Sesi 1-18):
+1. Import library (torch, nn, F, Dataset, DataLoader, AutoTokenizer, AutoModel)
+2. Konfigurasi (SEED=42, MAX_LENGTH=512)
+3. GRU_HIDDEN=256 (dari ablation)
+4. Cara kerja GRU (sticky note + update/reset gate)
+5. Training loop (forward, loss, backward)
+6. Cross Entropy Loss (`-log(p)`)
+7. Class Weight (×1.5 amplifikasi)
+8. CPU vs GPU & `.to(device)`
+9. Focal Loss & gamma=2.0
+10. GRU_LAYERS=2 (2 tim analis berlapis)
+11. DROPOUT=0.2 (lampu mati random)
+12. Data Loading (3 CSV → concat → df_seed)
+13. EDA & Preprocessing (stratified split, label remap, class weights)
+14. Tokenisasi (`attention_mask`, `padding=False`, DataCollator)
+15. Arsitektur IndoBertGRU (komponen + forward step-by-step)
+16. Tensor shape `[batch, token, 768]`
+17. Padding & PAD token (kenapa ada lalu dibuang)
+18. BiGRU & h_n[-2], h_n[-1] (gedung 4 lantai)
+19. Linear layer (matriks × bobot + bias)
+20. IndoBERT belajar via Masked Language Modeling (~4GB teks Indonesia)
+21. **KLARIFIKASI**: 768 dimensi = MAKNA bukan SENTIMEN
+
+### ⏳ Yang Belum Dibahas:
+- Cell 14-15: FocalLossTrainer & compute_metrics
+- Cell 16-17: TrainingArguments detail (14 parameter)
+- Cell 18: `trainer.train()` — apa yang terjadi di balik layar
+- Cell 20-21: Evaluasi, classification_report, save model (kenapa `torch.save` bukan `trainer.save_model`)
+- Cell 22-23: PySastrawi, Confusion matrix, Word Cloud
+- Ablation Study (3 ablasi)
+- K-Fold CV (StratifiedKFold)
+- XAI dengan Captum (Integrated Gradients)
+- Statistical Testing (Bootstrap CI + McNemar)
+- Save predictions untuk McNemar di notebook lain
+
+---
+
+## 🚀 NEXT STEP UNTUK SESI BARU
+
+1. **Cek status XGBoost di Kaggle** — `kaggle kernels status nicolnicol/revision-indobert-xgboost`
+2. Kalau selesai → download output ke `C:\Users\Davin\Downloads\xgboost_output`
+3. **Lanjut belajar dari Cell 14-15 (FocalLossTrainer & compute_metrics)**
+4. Atau kalau mau, langsung lanjut ke Cell 16-18 (Training)
+
+---
+
+## 💡 CARA DAVIN MAU DIAJARIN (PENTING!)
+
+- **Pelan-pelan**, jangan langsung teknis
+- **Banyak contoh konkret** bahasa Indonesia (artikel politik)
+- **Before vs After** kalau bisa
+- **Analogi sehari-hari** (sticky note, gedung lantai, dapur, lampu, dll)
+- **Sebutkan alternatif** yang tidak dipakai + alasannya (buat antisipasi pertanyaan dosen)
+- **Kasih jawaban siap pakai buat sidang** dalam bahasa formal
+- **Cecar dengan pertanyaan balik** setelah jelasin — buat latihan sidang
+- Catat progress di **BELAJAR.md** secara berkala
+- Pakai bahasa santai/ngobrol, jangan kaku
+
+---
+
 *Dokumen ini terus diupdate setiap sesi belajar.*
-*Last updated: 2 Juni 2026*
+*Last updated: 3 Juni 2026 — End of Session*
