@@ -431,5 +431,87 @@ Tanpa focal loss → model buang waktu di artikel Netral yang mudah
 
 ---
 
+---
+
+## SESI 7: GRU_LAYERS = 2
+
+**Analogi: 2 tim analis berlapis**
+```
+Layer 1 (Junior) → belajar pola level rendah (kata-kata)
+                   "ada kata korupsi, ada kata pejabat"
+
+Layer 2 (Senior) → belajar pola level tinggi (makna & konteks)
+                   "oh ini kasus hukum serius!" → NEGATIF ✅
+```
+
+**Kenapa tidak 1 atau 3 layer?**
+| Layer | Masalah |
+|---|---|
+| 1 | Kurang dalam, susah tangkap pola kompleks |
+| **2** | **Sweet spot ✅** |
+| 3+ | Overfitting, vanishing gradient |
+
+**Ini bukan fitur GRU doang** — semua neural network bisa di-stack:
+- GRU, LSTM → `num_layers=2`
+- IndoBERT → sudah punya **12 layer Transformer** di dalamnya!
+- "Deep" di Deep Learning = banyak layer ditumpuk
+
+🎤 **Jawab dosen:**
+> *"Dua layer GRU memungkinkan model mempelajari representasi hierarki — layer pertama menangkap pola level kata, layer kedua menangkap pola level makna dan konteks. Lebih dari 2 layer berisiko overfitting untuk dataset 25K."*
+
+---
+
+## SESI 8: DROPOUT = 0.2
+
+**Analogi: 512 lampu yang random dimatiin saat training**
+
+```
+TANPA Dropout:
+💡💡💡💡💡💡💡💡💡💡 → semua selalu nyala
+→ tiap neuron spesialisasi 1 hal saja
+→ ketemu kata baru → panik! → OVERFITTING
+
+DENGAN Dropout 0.2:
+Batch 1: 💡💡⬛💡💡⬛💡💡💡⬛ (20% = 102 neuron mati random)
+Batch 2: ⬛💡💡💡⬛💡💡⬛💡💡 (beda lagi yang mati)
+→ semua neuron terpaksa serba bisa
+→ model lebih ROBUST & GENERAL ✅
+```
+
+**Kapan dropout ON/OFF?**
+```
+model.train() → dropout ON  (saat training)
+model.eval()  → dropout OFF (saat evaluasi & predict)
+```
+Trainer ngatur ini otomatis — tidak perlu manual!
+
+**Analogi ON/OFF:**
+```
+Training = latihan pakai rompi berat (dropout ON)
+Test     = pertandingan sungguhan tanpa beban (dropout OFF)
+```
+
+**Kenapa 0.2?**
+| Nilai | Efek |
+|---|---|
+| 0.0 | Tidak ada dropout → overfitting |
+| 0.1 | Terlalu ringan |
+| **0.2** | **Sweet spot untuk BERT-based model ✅** |
+| 0.5 | Terlalu agresif, susah belajar |
+
+**Kalau tidak pakai dropout → model OVERFITTING:**
+```
+Training accuracy  : 95% ← hafal data training
+Validation accuracy: 72% ← jelek di data baru!
+```
+
+✅ **Yang dipakai:** Dropout 0.2
+❌ **Alternatif:** Tidak pakai dropout (overfitting), dropout 0.5 (terlalu agresif)
+
+🎤 **Jawab dosen:**
+> *"Dropout adalah teknik regularisasi yang secara random mematikan 20% neuron saat training. Ini mencegah neuron terlalu bergantung satu sama lain sehingga model dipaksa belajar representasi yang lebih robust. Saat evaluasi, dropout dinonaktifkan otomatis sehingga semua neuron aktif."*
+
+---
+
 *Dokumen ini terus diupdate setiap sesi belajar.*
 *Last updated: 2 Juni 2026*
