@@ -1,0 +1,16 @@
+{
+  "model": "IndoBERT + GRU",
+  "architecture": "[CLS] \u2192 GRU(hidden=256, layers=2) \u2192 Linear \u2192 Softmax",
+  "indobert": "indobenchmark/indobert-base-p1",
+  "max_length": 512,
+  "dropout": 0.2,
+  "results": {
+    "accuracy": 0.8379072063178677,
+    "macro_f1": 0.8281702569723319,
+    "weighted_f1": 0.8383232743046543
+  },
+  "data": {
+    "train_samples": 20257,
+    "val_samples": 5065
+  }
+}
