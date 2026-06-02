@@ -513,5 +513,122 @@ Validation accuracy: 72% ← jelek di data baru!
 
 ---
 
+---
+
+## SESI 9: DATA LOADING — Cell 7
+
+```python
+df1 = pd.read_csv(".../cnbc_labeled.csv")
+df2 = pd.read_csv(".../detik_labeled.csv")
+df3 = pd.read_csv(".../kompas_labeled.csv")
+
+df_seed = pd.concat([_select_cols(df1), _select_cols(df2), _select_cols(df3)],
+                     ignore_index=True)
+```
+
+**`_select_cols()`** = pilih 6 kolom yang relevan aja:
+```
+date, title, content, article_id, text, label
+→ kolom lain dibuang, dataframe lebih ringan
+```
+
+**`ignore_index=True`** = reset nomor baris setelah concat:
+```
+TANPA: index duplikat (0,1,2...9998, 0,1,2...5342) ❌
+DENGAN: index berurutan (0, 1, 2, ... 25321) ✅
+```
+
+---
+
+## SESI 10: EDA & PREPROCESSING — Cell 9
+
+**4 hal yang dilakukan sekaligus:**
+
+### 1. Visualisasi Distribusi Label
+```
+Bar chart + pie chart → kenalan sama data dulu!
+Konfirmasi class imbalance:
+Netral  : 13.000 (51.3%) ← mayoritas!
+Negatif :  6.322 (24.9%)
+Positif :  5.000 (23.8%)
+```
+
+### 2. Train/Val Split (Stratified)
+```python
+train_df, val_df = train_test_split(
+    df_seed, test_size=0.2,
+    stratify=df_seed['label'],  # ← KUNCI!
+    random_state=SEED
+)
+```
+
+**Kenapa stratify?**
+```
+TANPA: proporsi kelas bisa beda antara train & val → tidak representatif ❌
+DENGAN: proporsi kelas sama persis di train & val ✅
+
+Train : 20.257 artikel (80%)
+Val   :  5.065 artikel (20%)
+```
+
+### 3. Remap Label
+```python
+label_to_id = {-1: 0, 0: 1, 1: 2}
+# PyTorch butuh label mulai dari 0 berurutan
+# Label -1 tidak bisa dihandle PyTorch → ERROR!
+```
+
+### 4. Compute Class Weights
+Sudah dibahas di sesi sebelumnya 😄
+
+🎤 **Jawab dosen:**
+> *"Preprocessing meliputi 4 tahap: EDA untuk konfirmasi class imbalance, stratified split 80:20, remapping label dari -1,0,1 ke 0,1,2 untuk PyTorch, dan menghitung class weights untuk loss function."*
+
+---
+
+## SESI 11: TOKENISASI & DATASET — Cell 11
+
+### `attention_mask` — apaan?
+
+Masalah: artikel dalam satu batch harus panjang sama → perlu padding (PAD token).
+Tapi GRU tidak boleh baca PAD → merusak hidden state!
+
+**Solusi: attention_mask**
+```
+attention_mask = 1 → token NYATA, harus dibaca
+attention_mask = 0 → token PAD, SKIP!
+
+Contoh:
+input_ids      : [2983, 1234, 456,  0,   0,   0]
+attention_mask : [  1,    1,   1,   0,   0,   0]
+                  ↑baca  ↑baca ↑baca ↑skip ↑skip
+```
+
+### `padding=False` + `DataCollatorWithPadding`
+
+```
+padding='max_length' (BOROS):
+→ Pad SETIAP artikel ke 512 token selalu
+→ 16 artikel × 512 = 8.192 token per batch 😱
+
+padding=False + DataCollator (HEMAT):
+→ Pad ke panjang terpanjang DALAM BATCH itu aja
+→ Kalau max artikel 12 token → 16 × 12 = 192 token ✅
+→ Hemat VRAM & lebih cepat!
+```
+
+### `return_tensors=None`
+```
+None → tetap list Python dulu (fleksibel)
+'pt' → langsung tensor (susah di-batch karena ukuran beda)
+
+DataLoader yang convert ke tensor setelah tau ukuran batch!
+```
+
+🎤 **Jawab dosen:**
+> *"Kami menggunakan `padding=False` dan `DataCollatorWithPadding` untuk efisiensi memori. Padding hanya dilakukan sampai panjang artikel terpanjang dalam satu batch, bukan sampai MAX_LENGTH 512. Attention mask memberitahu model token mana yang nyata dan mana yang padding."*
+
+---
+
 *Dokumen ini terus diupdate setiap sesi belajar.*
 *Last updated: 2 Juni 2026*
