@@ -630,5 +630,302 @@ DataLoader yang convert ke tensor setelah tau ukuran batch!
 
 ---
 
+---
+
+## SESI 12: ARSITEKTUR MODEL `IndoBertGRU` — Cell 13
+
+### Komponen di `__init__()`:
+
+| Komponen | Kode | Fungsi |
+|---|---|---|
+| **IndoBERT** | `self.bert = AutoModel.from_pretrained(model_name)` | Load 12 layer Transformer. Output: `[batch, seq_len, 768]` |
+| **GRU** | `nn.GRU(input=768, hidden=256, layers=2, bidirectional=True)` | Layer GRU dua arah, 2 layer ditumpuk |
+| **Dropout** | `nn.Dropout(0.2)` | Matiin 20% neuron saat training |
+| **Classifier** | `nn.Linear(512, 3)` | 512 (= 256×2 BiGRU concat) → 3 kelas sentimen |
+
+### Kenapa harus extend `nn.Module`?
+
+Semua model PyTorch wajib extend `nn.Module` — kayak "KTP" biar PyTorch kenal & bisa manage otomatis (`.to(device)`, `.train()`, `.eval()`, hitung gradient, dll).
+
+`super().__init__()` = daftar ke PyTorch dulu sebelum tambahin komponen.
+
+### Alur Data Forward — Step by Step:
+
+```
+Input artikel
+    ↓ Tokenizer
+Token IDs [101, 2983, 1234, ...]
+    ↓ IndoBERT (12 layer Transformer)
+[batch, seq_len, 768]  ← setiap token dapat vektor 768 dimensi
+    ↓ pack_padded_sequence (buang PAD)
+sequence padat
+    ↓ BiGRU (2 arah)
+forward h_n[-2]  +  backward h_n[-1]
+    ↓ torch.cat([h_n[-2], h_n[-1]], dim=1)
+[batch, 512]
+    ↓ Dropout (matiin 20%)
+[batch, 512]
+    ↓ Linear(512→3)
+[batch, 3] = logits
+    ↓ argmax
+[-2.1, 0.3, 4.8] → POSITIF! ✅
+```
+
+---
+
+## SESI 13: BATCH × TOKEN × FITUR — Bentuk Tensor
+
+**`[batch, jumlah_token, 768]`** itu maksudnya:
+
+```
+Lapisan 1 = BATCH    → berapa artikel sekaligus (16 artikel/batch)
+Lapisan 2 = TOKEN    → berapa token per artikel (max 512)
+Lapisan 3 = FITUR    → 768 angka per token (dari IndoBERT)
+```
+
+Contoh dengan batch=2 artikel:
+```
+[
+  [  ← Artikel 1
+    [0.2, -0.8, 0.5, ... 768 angka],  ← token "Korupsi"
+    [0.1, -0.3, 0.7, ... 768 angka],  ← token "pejabat"
+  ],
+  [  ← Artikel 2
+    [0.3, -0.1, 0.8, ... 768 angka],  ← token "Presiden"
+    [0.5, -0.4, 0.6, ... 768 angka],  ← token "umumkan"
+  ]
+]
+```
+
+Shape di kode kamu: `[16, 512, 768]` = 16 artikel × max 512 token × 768 dimensi
+
+---
+
+## SESI 14: PADDING & ATTENTION MASK
+
+### Masalahnya:
+Artikel dalam satu batch panjangnya beda. Tapi GPU butuh ukuran sama!
+
+```
+Artikel 1: "Korupsi pejabat ditangkap" → 3 token
+Artikel 2: "Presiden umumkan kenaikan gaji karyawan" → 6 token
+```
+
+### Solusi: Padding
+```
+Artikel 1: [korupsi, pejabat, ditangkap, PAD, PAD, PAD]
+Artikel 2: [presiden, umumkan, kenaikan, gaji, karyawan, PAD]
+```
+
+Semua jadi 6 token! ✅
+
+### Tapi GRU ga boleh baca PAD!
+PAD = token kosong, bisa bikin sticky note GRU jadi rusak.
+
+### Solusi: `attention_mask`
+```
+attention_mask = 1 → "token NYATA, harus dibaca!"
+attention_mask = 0 → "token PAD, SKIP!"
+
+Artikel 1:
+input_ids      : [2983, 1234, 456,  0,   0,   0]
+attention_mask : [  1,    1,   1,   0,   0,   0]
+```
+
+### Mengapa PAD ada lalu dibuang lagi?
+- **IndoBERT (GPU paralel)** butuh ukuran sama → harus pakai PAD
+- **GRU (sequential)** ga butuh ukuran sama → buang PAD untuk efisiensi
+
+Solusi: `pack_padded_sequence` — peras artikel, gabungin semua token nyata jadi satu sequence padat, buang PAD.
+
+---
+
+## SESI 15: GRU BIDIRECTIONAL & h_n
+
+### `h_n` itu apa?
+**Hidden state TERAKHIR** setelah GRU selesai baca seluruh artikel. Sticky note akhir!
+
+```
+Baca "Korupsi"   → sticky note update
+Baca "pejabat"   → sticky note update
+Baca "ditangkap" → sticky note update
+Baca "KPK"       → sticky note FINAL ← ini h_n!
+```
+
+### Bentuk `h_n`:
+```
+h_n shape: [num_layers × 2, batch, hidden_size]
+         = [2 × 2, batch, 256]
+         = [4, batch, 256]
+```
+
+### Visualisasi sebagai gedung 4 lantai:
+
+```
+┌─────────────────────────────────┐
+│ Lantai 3 = h_n[3] = h_n[-1]     │  ← Layer 2, Backward ✅
+├─────────────────────────────────┤
+│ Lantai 2 = h_n[2] = h_n[-2]     │  ← Layer 2, Forward  ✅
+├─────────────────────────────────┤
+│ Lantai 1 = h_n[1] = h_n[-3]     │  ← Layer 1, Backward
+├─────────────────────────────────┤
+│ Lantai 0 = h_n[0] = h_n[-4]     │  ← Layer 1, Forward
+└─────────────────────────────────┘
+```
+
+### Kenapa `-2` dan `-1`?
+
+Index negatif = hitung dari belakang → **selalu ambil 2 lantai teratas (layer paling dalam)**.
+
+Kalau pakai index positif (2 dan 3) → harus ganti code kalau jumlah layer berubah.
+Kalau pakai negatif (-2 dan -1) → otomatis bener berapapun jumlah layer.
+
+### Forward vs Backward — 2 orang baca artikel:
+
+```
+Artikel: "Meski ekonomi lesu, pertumbuhan akhirnya meningkat pesat"
+
+Orang 1 (Forward, kiri→kanan):
+"awalnya negatif... ada pembalikan... akhirnya positif"
+→ KESIMPULAN FORWARD = h_n[-2]  [256 angka]
+
+Orang 2 (Backward, kanan→kiri):
+"sangat positif... meski awalnya susah... akhirnya berhasil"
+→ KESIMPULAN BACKWARD = h_n[-1]  [256 angka]
+
+Gabung: torch.cat([h_n[-2], h_n[-1]], dim=1) → [batch, 512]
+```
+
+Dua perspektif = pemahaman lebih lengkap! Penting karena kata akhir kalimat sering mempengaruhi makna kata awal.
+
+---
+
+## SESI 16: LINEAR LAYER & LOGITS
+
+### `nn.Linear(512, 3)` = perkalian matriks + bias
+
+```
+output = input × W + b
+
+W = matriks bobot [512, 3]  ← 1.536 angka yang dipelajari
+b = bias [3]                 ← 3 angka tambahan
+```
+
+### Cara hitung:
+```
+Skor Negatif = (a1×w1) + (a2×w2) + ... + (a512×w512) + b1
+Skor Netral  = (a1×w3) + (a2×w4) + ... + (a512×w1024) + b2
+Skor Positif = (a1×w5) + (a2×w6) + ... + (a512×w1536) + b3
+
+Hasil: [-2.1, 0.3, 4.8] = logits
+       Neg   Net   Pos
+
+argmax → POSITIF! ✅
+```
+
+### Analogi 512 saksi:
+Bayangin 512 saksi, masing-masing punya bobot kepercayaan berbeda untuk tiap vonis. Setiap saksi vote dengan bobotnya → semua suara dijumlahkan → vonis akhir.
+
+### Output 3 karena 3 kelas:
+Kalau task binary classification → output 2. Kalau 10 kelas → output 10.
+
+### Logits ≠ Probabilitas
+Logits = skor mentah (bisa negatif, bisa > 1). Trainer otomatis apply Softmax saat predict untuk dapat probabilitas.
+
+---
+
+## SESI 17: BAGAIMANA INDOBERT "BELAJAR" 768 DIMENSI?
+
+### Tidak ada yang melabeli!
+IndoBERT pakai **Self-Supervised Learning** dengan tugas **Masked Language Modeling (MLM)**.
+
+### Cara kerja MLM:
+```
+Kalimat asli: "Presiden menandatangani keputusan penting"
+
+IndoBERT dikasih: "Presiden [MASK] keputusan penting"
+                              ↑ disembunyikan
+
+IndoBERT harus tebak: "[MASK] = menandatangani"
+```
+
+Salah → koreksi bobot → coba lagi dengan jutaan kalimat lain.
+
+### Data IndoBERT:
+- Wikipedia Bahasa Indonesia
+- Berita online
+- Web crawl teks Indonesia
+- Total: ~4GB teks!
+
+### Hasilnya: representasi otomatis terbentuk
+```
+"korupsi" sering muncul dekat "pejabat", "ditangkap", "KPK"
+→ 768 angkanya jadi mirip dengan kata-kata negatif
+
+"berhasil" sering muncul dekat "pertumbuhan", "meningkat"
+→ 768 angkanya jadi mirip dengan kata-kata positif
+```
+
+### Analogi belajar bahasa asing tanpa kamus:
+```
+Dengar 1000x:
+"Il fait beau aujourd'hui" → orang senyum, pergi keluar
+"Il fait froid aujourd'hui" → orang pakai jaket, menggigil
+
+Tanpa kamus, kamu otomatis tau:
+"beau" = bagus, "froid" = dingin
+```
+
+IndoBERT belajar dari **konteks**, bukan dari label!
+
+---
+
+## SESI 18: KLARIFIKASI PENTING — REPRESENTASI vs SENTIMEN
+
+### 768 angka IndoBERT BUKAN label "positif/negatif"!
+
+768 angka = **representasi MAKNA umum**, bukan sentimen!
+
+```
+"korupsi" → [0.2, -0.8, 0.5, ...]
+            ↑ ini cuma bilang: "kata ini terkait tindakan ilegal,
+              pejabat, hukum, uang"
+            ← TIDAK ada info "ini negatif"!
+```
+
+### IndoBERT itu netral:
+Bisa dipake untuk:
+- Sentiment analysis ← skripsimu
+- Ringkasan teks
+- Deteksi hoax
+- Question answering
+- Dll.
+
+### Yang nentuin sentimen = GRU + Classifier (yang KAMU tambah!)
+
+```
+IndoBERT = kamus → "korupsi = tindakan ilegal mengambil uang negara"
+           ← belum tau ini sentimen apa
+
+GRU + Classifier = kamu yang baca & simpulkan
+                    "ada 'korupsi' → ini NEGATIF"
+                    ← di sinilah sentimen ditentukan!
+```
+
+### Konteks-sensitif:
+Kata yang sama bisa punya 768 angka berbeda tergantung kalimatnya!
+```
+"korupsi" di kalimat A → [0.2, -0.8, 0.5, ...]
+"korupsi" di kalimat B → [0.1, -0.6, 0.4, ...]
+                          ↑ beda! Karena konteksnya beda
+```
+
+Inilah kelebihan BERT vs Word2Vec/GloVe — **representasi kontekstual**, bukan fixed embedding.
+
+### 🎤 Jawab dosen:
+> *"IndoBERT menggunakan self-supervised learning dengan Masked Language Modeling pada corpus ~4GB teks Indonesia. Representasi 768 dimensi yang dihasilkan adalah representasi makna kontekstual — bukan label sentimen. Sentimen ditentukan oleh layer downstream (BiGRU + Linear classifier) yang dilatih khusus untuk task klasifikasi sentimen menggunakan dataset berlabel kami."*
+
+---
+
 *Dokumen ini terus diupdate setiap sesi belajar.*
 *Last updated: 2 Juni 2026*
