@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | **IndoBERT + GRU** | **82.45%** | **83.51%** | ✅ SELESAI | `C:\Users\Davin\Downloads\gru_output\gru_best\model.safetensors` (485 MB) |
 | **IndoBERT + CNN** | **82.55%** | **83.55%** | ✅ SELESAI | `C:\Users\Davin\Downloads\cnn_output\cnn_best\model_state_dict.pt` (479 MB) |
-| IndoBERT + XGBoost | - | - | 🔄 Running di Kaggle nicolnicol | TBD |
+| **IndoBERT + XGBoost** | **68.28%** | **70.64%** | ✅ SELESAI | `C:\Users\Davin\Downloads\xgboost_output\indobert_xgboost_model.json` |
 | IndoBERT + BiLSTM | - | - | ⏳ Belum push | TBD |
 | IndoBERT Fine-Tuned | - | - | ⏳ Belum push | TBD |
 | IndoBERT + RFC | - | - | ⏳ Belum push | TBD |
@@ -26,6 +26,11 @@
 ### Hasil Detail CNN:
 - Accuracy: 0.8355 | Macro F1: 0.8255 | Weighted F1: 0.8359
 - F1-Neg: 0.7998 | F1-Neu: 0.8533 | F1-Pos: 0.8233
+
+### Hasil Detail XGBoost:
+- Accuracy: 0.7064 | Macro F1: 0.6828 | Weighted F1: 0.7067
+- Best iteration: 239 / 500 (early stopping)
+- Catatan: Lebih rendah dari GRU/CNN karena BERT di-freeze (tidak joint optimization)
 
 ---
 
@@ -90,10 +95,16 @@ skripsis/
 
 ## 🚀 Next Step
 
-1. Cek status XGBoost di Kaggle
-2. Kalau selesai → download output
-3. Lanjut belajar dari **Cell 14-15 (FocalLossTrainer & compute_metrics)**
-4. Sambil tunggu, bisa push BiLSTM/IndoBERT-FT/RFC ke Kaggle teman
+1. Push & run notebook **BiLSTM** ke Kaggle
+2. Push & run notebook **IndoBERT Fine-Tuned** ke Kaggle
+3. Push & run notebook **RFC** ke Kaggle
+4. Setelah semua model selesai → **uncomment ablation cells** di XGBoost notebook (notebook terpisah, load embeddings dari file)
+5. Lanjut belajar dari **Cell 14-15 (FocalLossTrainer & compute_metrics)**
+
+### Catatan XGBoost:
+- Model utama ✅ sudah save
+- Ablation, K-Fold, SHAP, Statistical Test → masih di-comment, perlu run terpisah
+- Embeddings belum di-save ke disk (perlu ditambahkan sebelum ablation run)
 
 ---
 
