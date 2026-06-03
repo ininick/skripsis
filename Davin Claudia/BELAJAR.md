@@ -955,6 +955,9 @@ Inilah kelebihan BERT vs Word2Vec/GloVe — **representasi kontekstual**, bukan 
 21. IndoBERT belajar via Masked Language Modeling
 22. **KLARIFIKASI**: 768 dimensi = MAKNA bukan SENTIMEN
 
+23. **SESI 19**: Kenapa BERT di CPU untuk XGBoost pipeline
+24. **SESI 20**: Debug OOM notebook XGBoost (reuse embeddings + memory cleanup)
+
 ### ⏳ Belum Dibahas (Next Session):
 - Cell 14-15: FocalLossTrainer & compute_metrics
 - Cell 16-17: TrainingArguments detail (14 parameter)
@@ -966,6 +969,119 @@ Inilah kelebihan BERT vs Word2Vec/GloVe — **representasi kontekstual**, bukan 
 - XAI dengan Captum (Integrated Gradients)
 - Statistical Testing (Bootstrap CI + McNemar)
 - Save predictions untuk McNemar di notebook lain
+
+---
+
+## SESI 19: KENAPA BERT DI CPU UNTUK PIPELINE XGBOOST?
+
+Log Kaggle menunjukkan:
+```
+BERT device: cpu (CPU for compatibility)
+GPU available: Tesla T4
+XGBoost will use GPU for training
+```
+
+**Pertanyaan wajar: kenapa tidak semuanya GPU?**
+
+### Jawabannya: disengaja, bukan bug!
+
+Pipeline XGBoost punya **2 tahap yang beda ekosistem**:
+
+```
+Tahap 1: IndoBERT → extract embeddings (inference saja, dilakukan SEKALI)
+Tahap 2: XGBoost → training classifier (butuh banyak iterasi)
+```
+
+### Kenapa tidak bisa keduanya GPU sekaligus?
+
+PyTorch (untuk BERT) dan XGBoost GPU backend sama-sama pakai CUDA, tapi **memory management-nya sendiri-sendiri**. Kalau dijalankan bersamaan di GPU yang sama:
+- Bisa konflik alokasi memori CUDA
+- Bisa crash OOM
+- Bisa ada bug yang susah di-debug
+
+### Trade-off yang masuk akal:
+
+| | IndoBERT | XGBoost |
+|---|---|---|
+| Mode | Inference (tidak ditraining!) | Training (ribuan iterasi) |
+| Dilakukan | Sekali saja, hasil disimpan | Berkali-kali sampai konvergen |
+| Device | CPU → aman, cukup | GPU → perlu parallelism! |
+| Keuntungan GPU | Kecil (inference sudah cukup cepat) | Besar (tree building sangat paralel) |
+
+**Analogi:** Kamu fotokopi dokumen (BERT extract embeddings) di mesin yang biasa — tidak perlu mesin canggih karena cukup dilakukan sekali. Mesin canggih (GPU) lebih berguna untuk proses berikutnya yang berulang-ulang (XGBoost training).
+
+🎤 **Jawab dosen:**
+> *"Pada pipeline IndoBERT + XGBoost, IndoBERT dijalankan di CPU untuk feature extraction karena prosesnya hanya inference satu kali dan tidak memerlukan GPU. GPU dialokasikan penuh untuk XGBoost training yang membutuhkan paralelisme tinggi via CUDA backend, sehingga menghindari konflik alokasi memori CUDA antara dua framework yang berbeda."*
+
+---
+
+## SESI 20: DEBUG OOM NOTEBOOK XGBOOST
+
+### Masalah yang terjadi:
+Kernel Kaggle crash dengan error: **"Your notebook tried to allocate more memory than is available."**
+
+### Detektif: cari penyebabnya
+
+Setelah baca notebook, ditemukan **2 pemborosan memori**:
+
+**Pemborosan 1 — Cell 21 (Ablation 1): array tidak dihapus setelah selesai**
+```
+Setelah ablation mean pooling selesai, masih ada di memori:
+X_train_mean  (~59 MB)   ← tidak dipakai lagi
+X_val_mean    (~15 MB)   ← tidak dipakai lagi
+X_train_mean_s (~59 MB) ← tidak dipakai lagi
+X_val_mean_s  (~15 MB)  ← tidak dipakai lagi
+= ~148 MB nganggur!
+```
+
+**Pemborosan 2 — Cell 27 (K-Fold): ekstrak ulang embeddings yang sudah ada!**
+```
+X_train + X_val sudah di memori (dari cell 13)
+→ Cell 27 ekstrak ulang semua 25K artikel lagi → buang-buang RAM + waktu!
+
+Padahal:
+X_train (80%) + X_val (20%) = X_all (100%) ← np.vstack saja!
+```
+
+Plus bert_model (~430 MB) masih di memori padahal sudah tidak dipakai lagi setelah semua ekstraksi selesai.
+
+### Fix yang diterapkan:
+
+**Fix 1 — Akhir cell 21, tambah cleanup:**
+```python
+del X_train_mean, X_val_mean, X_train_mean_s, X_val_mean_s, xgb_mean
+import gc; gc.collect()
+print("✅ Ablation 1 memory freed")
+```
+
+**Fix 2 — Awal cell 27, ganti ekstraksi dengan reuse:**
+```python
+# SEBELUM (boros):
+X_all_kf = extract_embeddings(texts=df_seed['text'].tolist(), ...)  # ekstrak 25K lagi!
+
+# SESUDAH (efisien):
+X_all_kf = np.vstack([X_train, X_val])       # sudah ada, tinggal gabung!
+all_labels_kf = np.concatenate([y_train, y_val])
+
+del bert_model  # bebaskan 430 MB
+gc.collect()
+torch.cuda.empty_cache()
+```
+
+### Apakah hasilnya berubah? TIDAK!
+
+```
+X_train = 80% data (20.257 artikel) → sudah diekstrak
+X_val   = 20% data ( 5.065 artikel) → sudah diekstrak
+np.vstack = 100% data (25.322 artikel) ← SAMA PERSIS dengan ekstrak ulang
+```
+
+Ibaratnya: kamu sudah punya fotokopi halaman 1-80 dan 81-100. Tidak perlu fotokopi ulang semua 100 halaman — tinggal disatukan!
+
+### Pelajaran untuk sidang:
+
+Kalau dosen tanya *"kenapa implementasinya begini?"*:
+> *"Untuk efisiensi memori, embeddings yang sudah diekstrak pada tahap train-val split digunakan kembali untuk K-Fold dengan menggabungkan array menggunakan np.vstack. Ini menghindari redundant extraction yang menyebabkan out-of-memory error, sambil menghasilkan hasil yang identik secara matematis."*
 
 ---
 
