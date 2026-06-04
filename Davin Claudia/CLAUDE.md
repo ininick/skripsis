@@ -67,15 +67,18 @@
 
 ### Kaggle Kernels:
 - `davinraffilio9/revisi-fix-indobert-gru` — ✅ Selesai
-- `nicolnicol/revision-of-cnn-tok` — ✅ Selesai (CANCELED setelah save)
-- `nicolnicol/revision-indobert-xgboost` — 🔄 Running manual T4
+- `nicolnicol/revision-of-cnn-tok` — ✅ Selesai
+- `nicolnicol/revision-indobert-xgboost` — ✅ Selesai (v14, model saved)
+- `nicolnicol/revision-indobert-finetuned` — ✅ Selesai
+- `nicolnicol/revision-indobert-base-frozen` — ⏳ Ready (belum run, GPU abis)
+- BiLSTM & RFC — ✅ Selesai (dirun teman)
 
 ### Cara Cek & Download:
 ```powershell
 $env:PYTHONUTF8 = "1"
 $env:KAGGLE_API_TOKEN = "KGAT_3b5e4e2b8b5106b09a3c56bf7294d997"
-kaggle kernels status nicolnicol/revision-indobert-xgboost
-kaggle kernels output nicolnicol/revision-indobert-xgboost -p "C:\Users\Davin\Downloads\xgboost_output"
+kaggle kernels status nicolnicol/<kernel-name>
+kaggle kernels output nicolnicol/<kernel-name> -p "C:\Users\Davin\Downloads\<output-folder>"
 ```
 
 ---
@@ -90,16 +93,28 @@ skripsis/
 │   └── BELAJAR.md    ← materi pembelajaran sesi by sesi
 ├── MODEL/
 │   ├── README.md, GRU/, CNN/
-└── revision/
-    ├── GRU/, CNN/, XGBoost/ (pushed)
-    └── BiLSTM/, IndoBERT-FineTuned/, RFC/ (belum push)
+└── revision/          ← SEMUA notebook revisi (untuk sidang/ICISS)
+    ├── GRU/           ✅ pushed + kernel-metadata.json
+    ├── CNN/           ✅ pushed + kernel-metadata.json
+    ├── XGBoost/       ✅ pushed + kernel-metadata.json (reviewer cells di-comment)
+    ├── BiLSTM/        ✅ pushed (reviewer cells di-comment, warmup_ratio fixed)
+    ├── IndoBERT-FineTuned/ ✅ pushed + kernel-metadata.json (reviewer cells di-comment)
+    ├── IndoBERT-Base/ ✅ pushed + kernel-metadata.json (reviewer cells di-skip)
+    └── RFC/           ✅ pushed
 ```
 
 ### File di Downloads:
-- `Panduan_Sidang_Skripsi_Davin.pdf` — panduan sidang lengkap
-- `Panduan_Cell_per_Cell_Notebook.pdf` — penjelasan tiap cell GRU & CNN
-- `Revised_Paper_IEEE_XX.docx` — paper revisi IEEE format, placeholder `[XX]` kuning
-- `gru_output/` (485 MB), `cnn_output/` (479 MB)
+- `MODEL DEEPLEARNING/` — **SEMUA model files dalam 1 folder** (untuk OneDrive upload):
+  - `GRU/model.safetensors` + tokenizer files
+  - `CNN/model_state_dict.pt` + tokenizer files
+  - `BiLSTM/pytorch_model.bin` + config + tokenizer
+  - `IndoBERT-FineTuned/model_state_dict.pt` + summary + tokenizer
+  - `XGBoost/indobert_xgboost_model.json` + scaler + summary
+  - `RFC/indobert_rfc_model.pkl` + scaler + summary + plots
+  - `IndoBERT - Base Model/indobert_base_summary.json` + preds
+  - **7 PDF dokumentasi** (1 per model, penjelasan tiap code block + analisis reviewer)
+- `Revised_Paper_IEEE_XX.docx` — paper revisi asli (placeholder `[XX]` kuning)
+- `Revised_Paper_IEEE_UPDATED.docx` — paper yang sudah diisi hasil training (sebagian, K-Fold/McNemar masih pending)
 
 ---
 
@@ -117,21 +132,31 @@ skripsis/
 
 ---
 
-## 🚀 Next Step
+## 🚀 Next Step — Yang Masih Perlu Dikerjakan
 
-1. Dapat hasil BiLSTM dari teman (summary.json / Macro F1)
-2. Jalankan **ablation study** semua model (notebook terpisah)
-3. Jalankan **K-Fold CV** semua model
-4. Jalankan **XAI** (Integrated Gradients untuk DL, SHAP untuk XGBoost/RFC)
-5. Jalankan **McNemar test** — best model (Fine-Tuned) vs semua lainnya
-6. Update paper IEEE dengan semua hasil revisi
-4. Setelah semua model selesai → **uncomment ablation cells** di XGBoost notebook (notebook terpisah, load embeddings dari file)
-5. Lanjut belajar dari **Cell 14-15 (FocalLossTrainer & compute_metrics)**
+### Prioritas 1: Reviewer Revisions (uncomment & run)
+Semua notebook sudah punya code reviewer (di-comment). Perlu dijalankan:
+1. **Uncomment ablation cells** di semua 7 notebook → run
+2. **Uncomment K-Fold CV cells** di semua 7 notebook → run
+3. **Uncomment XAI cells** (Integrated Gradients untuk DL, SHAP untuk XGBoost/RFC) → run
+4. **Uncomment Statistical Significance cells** (Bootstrap CI + McNemar) → run
+5. **Uncomment Efficiency Analysis cells** → run
 
-### Catatan XGBoost:
-- Model utama ✅ sudah save
-- Ablation, K-Fold, SHAP, Statistical Test → masih di-comment, perlu run terpisah
-- Embeddings belum di-save ke disk (perlu ditambahkan sebelum ablation run)
+### Prioritas 2: Paper Update
+- `Revised_Paper_IEEE_UPDATED.docx` sudah diisi sebagian
+- Masih "pending/TBD": K-Fold results, McNemar p-values, Efficiency table, per-class F1 beberapa model
+- Setelah semua reviewer revision selesai → isi semua placeholder
+
+### Prioritas 3: Belajar Sidang
+- Lanjut belajar dari **Cell 14-15 (FocalLossTrainer & compute_metrics)**
+- Review materi di BELAJAR.md (sudah sampai Sesi 20)
+
+### Catatan Teknis:
+- Semua notebook reviewer cells sudah di-comment (bukan dihapus!) → tinggal uncomment
+- XGBoost perlu save embeddings ke disk sebelum ablation run (biar tidak OOM)
+- BiLSTM ablation cells punya bug: `tokenizer=tokenizer` → harus ganti `processing_class=tokenizer`
+- BiLSTM K-Fold punya bug: double comma `gradient_accumulation_steps=2,,`
+- IndoBERT Base (Frozen) notebook belum dirun di Kaggle (GPU quota habis)
 
 ---
 
@@ -341,16 +366,17 @@ Split **80:20** dengan **Stratified** — proporsi kelas di train dan val dijaga
 **Model disimpan di:** `C:\Users\Davin\Downloads\gru_output\gru_best\`  
 **File:** `model_state_dict.pt` (~485 MB), `config.json`, `tokenizer files`
 
-### 5.3 Perbandingan Semua Model (Target)
+### 5.3 Perbandingan Semua 7 Model (FINAL)
 
-| Model | Macro F1 | Status |
-|---|---|---|
-| **IndoBERT + GRU** | **82.82%** | ✅ SELESAI |
-| IndoBERT + CNN | TBD | 🔄 Running |
-| IndoBERT + BiLSTM | TBD | ⏳ Antrian |
-| IndoBERT Fine-Tuned | TBD | ⏳ Antrian |
-| IndoBERT + XGBoost | TBD | ⏳ Antrian |
-| IndoBERT + RFC | TBD | ⏳ Antrian |
+| Model | Macro F1 | Accuracy | Status |
+|---|---|---|---|
+| **IndoBERT Fine-Tuned** | **82.85%** 🥇 | 83.81% | ✅ SELESAI |
+| **IndoBERT + CNN** | **82.55%** 🥈 | 83.55% | ✅ SELESAI |
+| **IndoBERT + GRU** | **82.45%** 🥉 | 83.51% | ✅ SELESAI |
+| IndoBERT + BiLSTM | 76.56% | 77.93% | ✅ SELESAI |
+| IndoBERT + XGBoost | 68.28% | 70.64% | ✅ SELESAI |
+| IndoBERT + RFC | 63.27% | 70.33% | ✅ SELESAI |
+| IndoBERT Base (Frozen) | 35.80% | 37.93% | ✅ SELESAI |
 
 ---
 
