@@ -1,0 +1,14 @@
+{
+  "id": "nicolnicol/revisi-fix-indobert-gru",
+  "title": "revisi-fix-indobert-gru",
+  "code_file": "revisi-fix-indobert-gru.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": ["davinraffilio9/datalabeled"],
+  "competition_sources": [],
+  "kernel_sources": []
+}

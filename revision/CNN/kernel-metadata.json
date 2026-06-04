@@ -1,0 +1,14 @@
+{
+  "id": "nicolnicol/revision-of-cnn-tok",
+  "title": "revision-of-cnn-tok",
+  "code_file": "indobert-cnn-political-news.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": ["davinraffilio9/datalabeled"],
+  "competition_sources": [],
+  "kernel_sources": []
+}
