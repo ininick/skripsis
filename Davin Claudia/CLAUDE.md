@@ -8,16 +8,19 @@
 
 > Dibaca dulu kalau pindah window/context baru.
 
-## Status 6 Model Arsitektur
+## Status 7 Model Arsitektur
 
 | Model | Macro F1 | Accuracy | Status | Lokasi Model |
 |---|---|---|---|---|
-| **IndoBERT + GRU** | **82.45%** | **83.51%** | ✅ SELESAI | `C:\Users\Davin\Downloads\gru_output\gru_best\model.safetensors` (485 MB) |
-| **IndoBERT + CNN** | **82.55%** | **83.55%** | ✅ SELESAI | `C:\Users\Davin\Downloads\cnn_output\cnn_best\model_state_dict.pt` (479 MB) |
-| **IndoBERT + XGBoost** | **68.28%** | **70.64%** | ✅ SELESAI | `C:\Users\Davin\Downloads\xgboost_output\indobert_xgboost_model.json` |
-| IndoBERT + BiLSTM | - | - | ⏳ Belum push | TBD |
-| **IndoBERT Fine-Tuned** | **82.85%** | **83.81%** | ✅ SELESAI | `C:\Users\Davin\Downloads\finetuned_output\indobert_ft_best\model_state_dict.pt` |
-| IndoBERT + RFC | - | - | ⏳ Belum push | TBD |
+| **IndoBERT Fine-Tuned** | **82.85%** 🥇 | **83.81%** | ✅ SELESAI | `MODEL DEEPLEARNING\IndoBERT-FineTuned\model_state_dict.pt` |
+| **IndoBERT + CNN** | **82.55%** 🥈 | **83.55%** | ✅ SELESAI | `MODEL DEEPLEARNING\CNN\model_state_dict.pt` |
+| **IndoBERT + GRU** | **82.45%** 🥉 | **83.51%** | ✅ SELESAI | `MODEL DEEPLEARNING\GRU\model.safetensors` |
+| **IndoBERT + BiLSTM** | **TBD** | **TBD** | ✅ SELESAI | `MODEL DEEPLEARNING\BiLSTM\pytorch_model.bin` |
+| **IndoBERT + XGBoost** | **68.28%** | **70.64%** | ✅ SELESAI | `MODEL DEEPLEARNING\XGBoost\indobert_xgboost_model.json` |
+| **IndoBERT + RFC** | **63.27%** | **70.33%** | ✅ SELESAI | `MODEL DEEPLEARNING\RFC\indobert_rfc_model.pkl` |
+| **IndoBERT Base (Frozen)** | **35.80%** | **37.93%** | ✅ SELESAI | `MODEL DEEPLEARNING\IndoBERT - Base Model\` |
+
+> Semua model ada di `C:\Users\Davin\Downloads\MODEL DEEPLEARNING\`
 
 ### Hasil Detail GRU:
 - Accuracy: 0.8351 | Macro F1: 0.8245 | Weighted F1: 0.8354
@@ -27,14 +30,27 @@
 - Accuracy: 0.8355 | Macro F1: 0.8255 | Weighted F1: 0.8359
 - F1-Neg: 0.7998 | F1-Neu: 0.8533 | F1-Pos: 0.8233
 
-### Hasil Detail XGBoost:
-- Accuracy: 0.7064 | Macro F1: 0.6828 | Weighted F1: 0.7067
-- Best iteration: 239 / 500 (early stopping)
-- Catatan: Lebih rendah dari GRU/CNN karena BERT di-freeze (tidak joint optimization)
-
 ### Hasil Detail Fine-Tuned:
 - Accuracy: 0.8381 | Macro F1: 0.8285 | Weighted F1: 0.8386
 - Arsitektur: [CLS] → Dropout(0.1) → Linear(768,3) — full fine-tune semua parameter BERT
+
+### Hasil Detail XGBoost:
+- Accuracy: 0.7064 | Macro F1: 0.6828 | Weighted F1: 0.7067
+- Best iteration: 239 / 500 (early stopping)
+- Catatan: Lebih rendah karena BERT di-freeze (tidak joint optimization)
+
+### Hasil Detail RFC:
+- Accuracy: 0.7033 | Macro F1: 0.6327 | Weighted F1: 0.6843
+- OOB Score: 0.6927 | n_estimators: 500, max_depth: None
+- Catatan: Sama seperti XGBoost — BERT di-freeze, hanya classifier yang belajar
+
+### Hasil Detail IndoBERT Base (Frozen):
+- Accuracy: 0.3793 | Macro F1: 0.3580 | Weighted F1: 0.2463
+- Arsitektur: Frozen IndoBERT → [CLS] → Dropout → Linear(768,3)
+- Catatan: Sangat rendah karena BERT tidak di-fine-tune — ini membuktikan pentingnya fine-tuning!
+
+### Hasil Detail BiLSTM:
+- TBD (model ada, summary.json tidak tersedia)
 
 ---
 
@@ -99,9 +115,12 @@ skripsis/
 
 ## 🚀 Next Step
 
-1. Push & run notebook **BiLSTM** ke Kaggle
-2. Push & run notebook **RFC** ke Kaggle
-3. Push & run notebook **IndoBERT Base (Frozen)** ke Kaggle
+1. Dapat hasil BiLSTM dari teman (summary.json / Macro F1)
+2. Jalankan **ablation study** semua model (notebook terpisah)
+3. Jalankan **K-Fold CV** semua model
+4. Jalankan **XAI** (Integrated Gradients untuk DL, SHAP untuk XGBoost/RFC)
+5. Jalankan **McNemar test** — best model (Fine-Tuned) vs semua lainnya
+6. Update paper IEEE dengan semua hasil revisi
 4. Setelah semua model selesai → **uncomment ablation cells** di XGBoost notebook (notebook terpisah, load embeddings dari file)
 5. Lanjut belajar dari **Cell 14-15 (FocalLossTrainer & compute_metrics)**
 
