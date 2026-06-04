@@ -15,7 +15,7 @@
 | **IndoBERT Fine-Tuned** | **82.85%** 🥇 | **83.81%** | ✅ SELESAI | `MODEL DEEPLEARNING\IndoBERT-FineTuned\model_state_dict.pt` |
 | **IndoBERT + CNN** | **82.55%** 🥈 | **83.55%** | ✅ SELESAI | `MODEL DEEPLEARNING\CNN\model_state_dict.pt` |
 | **IndoBERT + GRU** | **82.45%** 🥉 | **83.51%** | ✅ SELESAI | `MODEL DEEPLEARNING\GRU\model.safetensors` |
-| **IndoBERT + BiLSTM** | **TBD** | **TBD** | ✅ SELESAI | `MODEL DEEPLEARNING\BiLSTM\pytorch_model.bin` |
+| **IndoBERT + BiLSTM** | **76.56%** | **77.93%** | ✅ SELESAI | `MODEL DEEPLEARNING\BiLSTM\pytorch_model.bin` |
 | **IndoBERT + XGBoost** | **68.28%** | **70.64%** | ✅ SELESAI | `MODEL DEEPLEARNING\XGBoost\indobert_xgboost_model.json` |
 | **IndoBERT + RFC** | **63.27%** | **70.33%** | ✅ SELESAI | `MODEL DEEPLEARNING\RFC\indobert_rfc_model.pkl` |
 | **IndoBERT Base (Frozen)** | **35.80%** | **37.93%** | ✅ SELESAI | `MODEL DEEPLEARNING\IndoBERT - Base Model\` |
@@ -50,7 +50,11 @@
 - Catatan: Sangat rendah karena BERT tidak di-fine-tune — ini membuktikan pentingnya fine-tuning!
 
 ### Hasil Detail BiLSTM:
-- TBD (model ada, summary.json tidak tersedia)
+- Accuracy: 0.7793 | Macro F1: 0.7656 | Weighted F1: 0.7796
+- F1-Neg: 0.7461 | F1-Neu: 0.8056 | F1-Pos: 0.7451
+- Best epoch: 14/15 (early stopping tidak trigger)
+- Catatan: Lebih rendah dari GRU karena LSTM 4 gate lebih berat → overfitting pada 25K dataset
+- Validation loss terus naik dari epoch 3 → tanda overfitting meskipun macro F1 masih naik
 
 ---
 
