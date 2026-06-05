@@ -134,22 +134,48 @@ skripsis/
 
 ## 🚀 Next Step — Yang Masih Perlu Dikerjakan
 
-### Prioritas 1: Reviewer Revisions (uncomment & run)
-Semua notebook sudah punya code reviewer (di-comment). Perlu dijalankan:
-1. **Uncomment ablation cells** di semua 7 notebook → run
-2. **Uncomment K-Fold CV cells** di semua 7 notebook → run
-3. **Uncomment XAI cells** (Integrated Gradients untuk DL, SHAP untuk XGBoost/RFC) → run
-4. **Uncomment Statistical Significance cells** (Bootstrap CI + McNemar) → run
-5. **Uncomment Efficiency Analysis cells** → run
+### ✅ Keputusan Strategi (5 Juni 2026):
+Davin memutuskan **JANGAN utak-atik notebook existing** (sudah selesai, model sudah save).
+Bikin **2 notebook baru terpisah** untuk reviewer revisions:
 
-### Prioritas 2: Paper Update
-- `Revised_Paper_IEEE_UPDATED.docx` sudah diisi sebagian
-- Masih "pending/TBD": K-Fold results, McNemar p-values, Efficiency table, per-class F1 beberapa model
-- Setelah semua reviewer revision selesai → isi semua placeholder
+**📓 Notebook 2 — Training-based Analysis** (butuh GPU + waktu lama)
+- Ablation study semua 7 model
+- K-Fold CV 5-fold semua 7 model
+- Lokasi: `revision/reviewer_analysis/02_ablation_kfold.ipynb` (BELUM DIBUAT)
 
-### Prioritas 3: Belajar Sidang
+**📓 Notebook 3 — Load-only Analysis** (cepat, bahkan bisa di CPU)
+- XAI (Integrated Gradients untuk DL, SHAP untuk XGBoost/RFC)
+- McNemar's Test (load .npy predictions)
+- Bootstrap Confidence Interval
+- Efficiency Analysis (latency, throughput, params)
+- Lokasi: `revision/reviewer_analysis/03_xai_mcnemar.ipynb` (BELUM DIBUAT)
+
+### ⚠️ PREREQUISITE Notebook 3:
+McNemar butuh `.npy` prediction files dari SEMUA model. Status saat ini:
+| Model | val_preds.npy | val_true.npy |
+|---|---|---|
+| Fine-Tuned | ✅ `finetuned_output/` | ✅ |
+| IndoBERT Base | ✅ `MODEL DEEPLEARNING/IndoBERT - Base Model/` | ✅ |
+| GRU | ❌ BELUM ADA | ❌ |
+| CNN | ❌ BELUM ADA | ❌ |
+| BiLSTM | ❌ BELUM ADA | ❌ |
+| XGBoost | ❌ BELUM ADA | ❌ |
+| RFC | ❌ BELUM ADA | ❌ |
+
+**Cara dapat predictions yang missing:**
+Load model existing → predict val_set → save .npy (TIDAK perlu training ulang!)
+Bisa dibuat script tersendiri "00_generate_predictions.ipynb"
+
+### Prioritas Eksekusi:
+1. **Bikin script generate `.npy` predictions** untuk model yang belum punya
+2. **Bikin Notebook 3** (XAI + McNemar + Bootstrap + Efficiency) — paling cepat selesai
+3. **Bikin Notebook 2** (Ablation + K-Fold) — paling lama, butuh GPU
+4. Update paper dengan semua hasil
+
+### Prioritas Sidang (parallel):
 - Lanjut belajar dari **Cell 14-15 (FocalLossTrainer & compute_metrics)**
-- Review materi di BELAJAR.md (sudah sampai Sesi 20)
+- Review materi di BELAJAR.md (sudah sampai Sesi 23)
+- Latihan jawab 10 pertanyaan sidang yang sudah disiapkan
 
 ### Catatan Teknis:
 - Semua notebook reviewer cells sudah di-comment (bukan dihapus!) → tinggal uncomment

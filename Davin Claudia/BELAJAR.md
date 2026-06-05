@@ -43,6 +43,7 @@ Setiap topik dijelaskan dengan format:
 25. **SESI 21**: Proses labeling dataset — reverse engineering & metodologi
 26. **SESI 22**: Semi-supervised labeling pipeline (TF-IDF + LR dari contoh manual)
 27. **SESI 23**: Scoreboard final 7 model + analisis BiLSTM overfitting
+28. **SESI 24**: Strategi reviewer revisions — 2 notebook terpisah (training vs load-only)
 
 ### ⏳ Belum Dibahas (Next Session):
 - FocalLossTrainer & compute_metrics detail
@@ -219,3 +220,68 @@ BiLSTM training loss terus turun (7.49 → epoch 15) tapi validation loss terus 
 
 *Dokumen materi pembelajaran. Untuk progress skripsi & status model lihat CLAUDE.md.*
 *Last updated: 5 Juni 2026*
+
+---
+
+## SESI 24: STRATEGI REVIEWER REVISIONS (5 Juni 2026)
+
+### Keputusan: JANGAN utak-atik notebook existing
+
+Karena semua 7 notebook sudah dirun & model sudah save, **berisiko** kalau diutak-atik (bisa crash, kehilangan model, dll). Solusinya: bikin notebook baru terpisah.
+
+### Pembagian 3 Notebook:
+
+**1. Existing Notebooks (LEAVE AS IS)**
+- 7 notebook utama yang sudah dirun → JANGAN DISENTUH
+- Model sudah save di `MODEL DEEPLEARNING/`
+
+**2. Notebook Training-based** (`02_ablation_kfold.ipynb`)
+- Ablation study (training 3-4 varian per model)
+- K-Fold CV 5-fold (training 5 model per arsitektur)
+- Butuh GPU Kaggle, run berjam-jam
+- **Bisa kurangi epochs jadi 5** (acceptable practice)
+
+**3. Notebook Load-only** (`03_xai_mcnemar.ipynb`)
+- XAI (Integrated Gradients DL, SHAP XGBoost/RFC)
+- McNemar's Test (load .npy predictions)
+- Bootstrap Confidence Interval
+- Efficiency Analysis (latency, throughput, params)
+- **Cepat**, bisa di CPU lokal
+
+### Prerequisite Notebook 3 — Generate .npy Predictions
+
+Cuma 2 dari 7 model yang punya .npy predictions:
+- ✅ Fine-Tuned
+- ✅ IndoBERT Base
+- ❌ GRU, CNN, BiLSTM, XGBoost, RFC
+
+Solusi: bikin script `00_generate_predictions.ipynb`:
+```python
+# Load model existing (TIDAK training ulang!)
+model = IndoBertGRU(...)
+model.load_state_dict(torch.load('model_state_dict.pt'))
+model.eval()
+
+# Predict val_set
+preds = trainer.predict(val_dataset)
+y_pred = np.argmax(preds.predictions, axis=1)
+
+# Save
+np.save('gru_val_preds.npy', y_pred)
+np.save('gru_val_true.npy', y_true)
+```
+
+### Urutan Kerja:
+1. Generate .npy predictions untuk 5 model (cepat, ~30 menit total)
+2. Buat Notebook 3 (XAI + McNemar + Bootstrap + Efficiency)
+3. Run Notebook 3 di Kaggle (cepat, ~1 jam)
+4. Buat Notebook 2 (Ablation + K-Fold)
+5. Run Notebook 2 di Kaggle (lama, butuh GPU quota)
+6. Update paper dengan semua hasil
+
+🎤 **Jawab dosen kalau ditanya kenapa pisah notebook:**
+> *"Untuk modularitas dan reproducibility. Notebook utama fokus pada training model, sementara reviewer analysis dipisah agar bisa direplikasi independen tanpa perlu retrain — peneliti lain bisa langsung load model kami dan menjalankan ablation, K-Fold, XAI, dan statistical testing."*
+
+---
+
+*Last updated: 5 Juni 2026 — sesi 24*
