@@ -13,925 +13,9 @@ Setiap topik dijelaskan dengan format:
 
 ---
 
-## SESI 1: IMPORT LIBRARY
-
-### `torch` vs `torch.nn` vs `torch.nn.functional`
-
-**Analogi: Dapur masak**
-
-| Library | Analogi | Fungsi |
-|---|---|---|
-| `torch` | Dapur itu sendiri | Operasi dasar, bikin tensor, pindah ke GPU |
-| `torch.nn` | Peralatan masak jadi | Layer siap pakai: GRU, Linear, Dropout |
-| `torch.nn.functional` (F) | Resep masakan | Fungsi langsung dijalankan: relu, softmax, cross_entropy |
-
-**Bedanya `nn` vs `F`:**
-- `nn.ReLU()` = beli alat, simpen di model, pakai berkali-kali
-- `F.relu(x)` = langsung jalankan fungsi sekarang, tidak perlu simpen
-
----
-
-### `Dataset` vs `DataLoader`
-
-**Analogi: Lemari kartu ujian vs Asisten**
-
-| | Analogi | Fungsi |
-|---|---|---|
-| `Dataset` | Lemari kartu ujian | Simpan & akses data satu per satu. Wajib punya `__len__` dan `__getitem__` |
-| `DataLoader` | Asisten yang ambil kartu batch | Ambil 16 artikel sekaligus, acak urutan, paralel loading |
-
-**Kenapa dari torch?**
-Karena semua komponen (Dataset → DataLoader → model → loss) harus dalam satu ekosistem PyTorch agar bisa ngobrol dalam format tensor yang sama. Tidak perlu konversi bolak-balik.
-
----
-
-### `AutoTokenizer` vs `AutoModel`
-
-**Analogi: Kamus vs Otak**
-
-| | Analogi | Fungsi |
-|---|---|---|
-| `AutoTokenizer` | Kamus | Ubah teks → angka (token IDs) |
-| `AutoModel` | Otak IndoBERT | Token IDs → vektor bermakna 768 dimensi |
-
-**Kenapa prefix `Auto`?**
-HuggingFace otomatis deteksi arsitektur yang tepat dari nama model. Tidak perlu tau persis kelas yang dipakai.
-
-```python
-# Contoh tokenizer:
-tokenizer("korupsi merajalela")
-# → {'input_ids': [101, 2983, 4521, 102], 'attention_mask': [1,1,1,1]}
-```
-
----
-
-## SESI 2: KONFIGURASI
-
-### `SEED = 42` dan `set_seed()`
-
-**Analogi: Mesin permen karet dengan nomor tombol**
-
-Komputer tidak bisa random beneran — dia pakai rumus matematika yang butuh titik awal (= SEED). Seed sama → urutan random sama → hasil training selalu bisa direproduksi.
-
-```python
-# TANPA seed:
-# Run Senin: F1 = 82%
-# Run Selasa: F1 = 79%  ← beda! Tidak bisa direproduksi
-
-# DENGAN set_seed(42):
-# Run Senin: F1 = 82%
-# Run Selasa: F1 = 82%  ← selalu sama! ✅
-```
-
-**`set_seed(42)` dari HuggingFace set 4 seed sekaligus:**
-```python
-random.seed(42)           # Python random
-np.random.seed(42)        # NumPy random
-torch.manual_seed(42)     # PyTorch CPU
-torch.cuda.manual_seed(42) # PyTorch GPU
-```
-
-**Kenapa angka 42?**
-Meme dari novel "Hitchhiker's Guide to the Galaxy" — 42 = jawaban atas segala pertanyaan di alam semesta 😄. Tidak ada alasan matematis khusus, angka apapun valid.
-
-✅ **Yang dipakai:** `SEED = 42`
-❌ **Alternatif:** Tidak pakai seed → hasil tidak reproducible
-
-🎤 **Jawab dosen:**
-> *"Kami menggunakan random seed 42 untuk memastikan reproducibility penelitian. Dengan seed yang sama, seluruh proses menghasilkan hasil yang identik setiap kali dijalankan. Ini penting untuk validasi dan replikasi hasil penelitian."*
-
----
-
-### `MAX_LENGTH = 512`
-
-**Analogi: Meja belajar yang cuma muat 512 buku**
-
-512 adalah **hard limit arsitektur BERT** — bukan pilihan, tapi batasan teknis yang sudah dikunci sejak BERT dibuat. Tidak bisa diubah tanpa ganti arsitektur.
-
-```python
-# Artikel pendek (100 token) → aman, muat
-# Artikel panjang (800 token) → dipotong jadi 512, sisanya DIBUANG ✂️
-```
-
-**Kenapa tidak pakai lebih kecil (misal 256)?**
-```
-MAX_LENGTH = 256 → teks terpotong di tengah kalimat
-                 → model tidak baca konteks akhir artikel
-                 → bisa salah prediksi sentimen
-```
-
-✅ **Yang dipakai:** 512 (maksimal yang tersedia)
-❌ **Alternatif:**
-- 256 → terlalu banyak konteks hilang
-- 1024 → tidak bisa! BERT keras di 512
-- Longformer (4096) → tidak ada versi IndoBERT, perlu retrain dari nol
-
-🎤 **Jawab dosen:**
-> *"MAX_LENGTH 512 adalah batas maksimal yang didukung arsitektur BERT. Kami menggunakan nilai maksimal ini untuk memastikan model membaca konteks artikel selengkap mungkin."*
-
-**Kalau ditanya kenapa tidak pakai model yang support >512:**
-> *"Ada model seperti Longformer yang support hingga 4096 token, namun tidak tersedia versi pre-trained untuk Bahasa Indonesia. Menggunakannya akan mengorbankan kualitas representasi Bahasa Indonesia yang sudah dioptimalkan IndoBERT."*
-
----
-
-### `GRU_HIDDEN = 256`
-
-**Analogi: Ukuran buku catatan GRU**
-
-Hidden size = seberapa banyak informasi yang bisa "diingat" GRU dalam satu waktu.
-
-```
-Hidden = 128 → buku catatan kecil → underfitting (lupa terlalu banyak)
-Hidden = 256 → buku catatan sedang → OPTIMAL ✅
-Hidden = 384 → buku catatan tebal → overfitting (hafal, tidak generalisasi)
-```
-
-**Dibuktikan dengan ablation study:**
-| Hidden Size | Macro F1 | Kesimpulan |
-|---|---|---|
-| 128 | lebih rendah | Underfitting |
-| **256** | **tertinggi** | **Sweet spot ✅** |
-| 384 | sedikit lebih rendah | Mulai overfitting |
-
-✅ **Yang dipakai:** 256 (terbukti dari ablation study)
-❌ **Alternatif:** 128 (underfitting), 384 (tidak signifikan lebih baik), 512 (terlalu besar untuk 25K dataset)
-
-🎤 **Jawab dosen:**
-> *"Pemilihan hidden size 256 didasarkan pada ablation study. Kami membandingkan 128, 256, dan 384. Hidden size 256 menghasilkan macro F1 tertinggi — 128 terlalu kecil sehingga underfitting, sedangkan 384 tidak memberikan peningkatan signifikan."*
-
----
-
-## SESI 3: CARA KERJA GRU
-
-**Analogi: Orang baca berita sambil pegang sticky note**
-
-Setiap baca satu kata, sticky note (= hidden state) di-update:
-
-```
-Baca "Presiden"   → sticky note: "ada tokoh penting"
-Baca "korupsi"    → sticky note: "ada hal negatif"
-Baca "ditangkap"  → sticky note: "kasus hukum serius"
-Baca "KPK"        → KESIMPULAN: NEGATIF! ✅
-```
-
-### 2 Tombol Pintar GRU:
-
-**Tombol 1 — UPDATE GATE 🔄**
-> "Informasi baru ini penting ga buat disimpen?"
-```
-Baca "korupsi"  → UPDATE GATE: "PENTING! Simpen!"
-Baca "yang"     → UPDATE GATE: "Ga penting, skip."
-```
-
-**Tombol 2 — RESET GATE 🗑️**
-> "Info lama yang ini masih relevan ga?"
-```
-Artikel ganti topik → RESET GATE: "Info lama hapus aja."
-```
-
-### GRU vs LSTM:
-
-| | GRU | LSTM |
-|---|---|---|
-| Tombol (gate) | 2 (update + reset) | 4 (input + forget + cell + output) |
-| Memori | 1 (hidden state) | 2 (hidden state + cell state) |
-| Kecepatan | ⚡ Lebih cepat | 🐢 Lebih lambat |
-| Parameter | Lebih sedikit | Lebih banyak |
-
-**Kenapa GRU dipilih:** Dataset 25K = medium size. GRU cukup dan lebih efisien dari LSTM.
-
-🎤 **Jawab dosen:**
-> *"GRU memproses teks secara sekuensial, token per token. Setiap langkah, GRU memperbarui hidden state yang berfungsi seperti memori — menyimpan konteks dari kata-kata sebelumnya. GRU memiliki dua mekanisme gating: update gate yang memutuskan informasi baru mana yang disimpan, dan reset gate yang memutuskan informasi lama mana yang dihapus."*
-
----
-
-## SESI 4: CARA MODEL BELAJAR (TRAINING LOOP)
-
-**Analogi: Murid yang belajar dari koreksi guru**
-
-Training = 3 langkah yang diulang ribuan kali:
-
-```
-STEP 1 — Forward Pass (tebak jawaban):
-Artikel → IndoBERT → GRU → Classifier → prediksi: POSITIF
-
-STEP 2 — Hitung Loss (ukur seberapa salah):
-Prediksi: POSITIF
-Jawaban benar: NEGATIF
-Loss = 3.0  ← besar = salah banget!
-
-STEP 3 — Backward Pass + Update (koreksi diri):
-"Parameter mana yang bikin salah? Koreksi sedikit!"
-optimizer.step()
-
-Ulangi untuk 20.257 artikel × 15 epoch
-```
-
-### Early Stopping:
-```python
-EarlyStoppingCallback(early_stopping_patience=3)
-
-# Artinya:
-Epoch 3: F1 = 0.82 ↑ naik → lanjut
-Epoch 4: F1 = 0.82 → tidak naik (1)
-Epoch 5: F1 = 0.81 → tidak naik (2)
-Epoch 6: F1 = 0.82 → tidak naik (3)
-STOP! → load balik model epoch 3 yang terbaik
-```
-
----
-
-## SESI 5: LOSS FUNCTION
-
-### Cross Entropy Loss (CE Loss)
-
-**Rumus:** `Loss = -log(probabilitas jawaban yang benar)`
-
-```
-Model yakin & BENAR  (prob = 0.85): Loss = -log(0.85) = 0.16  ← kecil ✅
-Model tidak yakin    (prob = 0.40): Loss = -log(0.40) = 0.92  ← sedang
-Model yakin & SALAH  (prob = 0.05): Loss = -log(0.05) = 3.00  ← besar 💀
-```
-
-**Intinya:** Makin yakin & benar → loss makin kecil. Makin yakin & salah → loss makin besar.
-
----
-
-### Class Weight — Atasi Class Imbalance
-
-**Masalah:** Dataset tidak seimbang:
-```
-Netral  : 13.000 artikel ← BANYAK
-Positif :  6.000 artikel
-Negatif :  6.322 artikel
-```
-
-Tanpa class weight → model bias ke Netral karena paling sering muncul.
-
-**Solusi di code:**
-```python
-# STEP 1: Hitung bobot otomatis (rumus bawaan sklearn)
-class_weights = compute_class_weight('balanced', ...)
-# Negative : 1.76
-# Neutral  : 0.59
-# Positive : 1.37
-
-# STEP 2: Amplifikasi manual × [1.5, 1.0, 1.5]
-class_weights = class_weights * np.array([1.5, 1.0, 1.5])
-# Negative : 1.76 × 1.5 = 2.64  ← boost extra!
-# Neutral  : 0.59 × 1.0 = 0.59  ← tetap
-# Positive : 1.37 × 1.5 = 2.05  ← boost extra!
-
-# STEP 3: Pindah ke GPU
-class_weights_tensor = torch.FloatTensor(class_weights).to(device)
-```
-
-**Kenapa dikali 1.5 lagi?**
-Bobot dasar dari sklearn masih kurang signifikan karena Netral sangat dominan. Amplifikasi 1.5x membuat penalti untuk kesalahan di kelas minoritas lebih terasa.
-
-**Efeknya:**
-```
-Salah prediksi Netral  : loss × 0.59 = dikecilkan
-Salah prediksi Negatif : loss × 2.64 = dibesarkan 4.5× lebih berat!
-```
-
-✅ **Yang dipakai:** Class weight balanced + amplifikasi 1.5x
-❌ **Alternatif:**
-- Tidak pakai class weight → model bias ke Netral
-- Oversampling (SMOTE) → berisiko untuk teks, duplikasi artikel bisa bikin model hafal
-- Undersampling → buang data Netral yang banyak, info hilang
-
-🎤 **Jawab dosen:**
-> *"Bobot dasar yang dihitung otomatis menggunakan metode balanced dari sklearn sudah memberikan bobot lebih pada kelas minoritas. Namun karena distribusi kelas Netral yang sangat dominan, bobot dasar tersebut masih belum cukup signifikan. Oleh karena itu kami menambahkan amplifikasi 1.5x pada kelas Negatif dan Positif agar penalti untuk kesalahan prediksi di kelas minoritas lebih terasa."*
-
----
-
-### CPU vs GPU — Kenapa `.to(device)`?
-
-**Analogi: Gudang di lantai berbeda**
-```
-CPU = gudang lantai 1
-GPU = gudang lantai 2
-
-Data di lantai 1 TIDAK BISA langsung dipakai di lantai 2!
-Harus dipindahin dulu dengan .to(device)!
-```
-
-```python
-# TANPA .to(device) → ERROR!
-class_weights = torch.FloatTensor([2.64, 0.59, 2.05])  # di CPU
-loss = ce_loss * class_weights  # ce_loss di GPU → ERROR! ❌
-
-# DENGAN .to(device) → AMAN!
-class_weights = torch.FloatTensor([2.64, 0.59, 2.05]).to(device)  # pindah ke GPU
-loss = ce_loss * class_weights  # keduanya di GPU → AMAN! ✅
-```
-
-| | CPU | GPU |
-|---|---|---|
-| Analogi | Kepala sekolah | Pasukan semut |
-| Core | 8-32 | Ribuan |
-| Kelebihan | Pinter, multitasking | Cepat untuk komputasi paralel |
-| Di Kaggle | Prosesor biasa | Tesla T4 (gratis!) |
-
----
-
----
-
-## SESI 6: FOCAL LOSS — DETAIL
-
-### Masalah yang belum terselesaikan sama class weight
-
-Meski class weight sudah ada, masih ada masalah:
-```
-13.000 artikel Netral → banyak yang MUDAH diprediksi
-→ Model sudah yakin & benar untuk artikel-artikel ini
-→ Tapi tetap mempengaruhi training dan buang waktu!
-```
-
-### Cara Kerja Focal Loss
-
-```python
-# Di code:
-pt = torch.exp(-ce_loss)        # seberapa yakin model
-focal_loss = ((1 - pt) ** 2.0 * ce_loss).mean()
-```
-
-**pt = seberapa yakin model terhadap jawaban yang benar**
-```
-Model yakin & benar  → pt TINGGI (0.90)
-Model salah/ragu     → pt RENDAH (0.08)
-```
-
-**`(1 - pt)^2` = pengatur volume:**
-```
-Artikel MUDAH (pt=0.90): (1-0.90)^2 = 0.01 → loss × 0.01 = diabaikan! 🔇
-Artikel SUSAH (pt=0.08): (1-0.08)^2 = 0.85 → loss × 0.85 = diperhatiin! 🔊
-```
-
-### Kenapa gamma = 2.0?
-```
-gamma = 0.0 → sama aja CE biasa, tidak ada efek
-gamma = 1.0 → efek ringan
-gamma = 2.0 → OPTIMAL (dari paper Lin et al. 2020) ✅
-gamma = 3.0 → terlalu agresif, overfitting
-```
-Dibuktikan dengan ablation study — gamma 2.0 menghasilkan macro F1 dan F1 kelas minoritas tertinggi.
-
-### Gabungan Class Weight + Focal Loss
-```
-Artikel Negatif SUSAH:
-① class weight : loss × 2.64
-② focal weight : × 0.85
-FINAL           : loss × 2.24  ← double boost!
-
-Artikel Netral MUDAH:
-① class weight : loss × 0.59
-② focal weight : × 0.01
-FINAL           : loss × 0.006 ← nyaris nol!
-```
-
-### Contoh artikel MUDAH vs SUSAH
-
-| Tipe | Contoh | Kenapa |
-|---|---|---|
-| Netral MUDAH | "Rapat kabinet membahas RAPBN hari ini" | Fakta polos, tidak ada kata emosional |
-| Positif MUDAH | "Presiden umumkan kenaikan gaji karyawan" | Jelas positif, tidak ambigu |
-| Negatif MUDAH | "Perang telah terjadi di Indonesia Timur" | Jelas negatif, kata 'perang' kuat |
-| Negatif SUSAH | "Korupsi telah terjadi di Polri, namun presiden berkata kasus harus diusut tuntas" | Sinyal campur: korupsi (negatif) vs usut tuntas (positif) |
-
-### Kenapa butuh KOMBINASI class weight + focal loss?
-
-```
-Class Weight = "SIAPA yang harus diperhatiin?"
-               → Kelas Negatif & Positif dapat bobot lebih besar
-
-Focal Loss   = "ARTIKEL MANA yang harus diperhatiin?"
-               → Artikel susah dapat perhatian lebih
-               → Artikel mudah diabaikan
-```
-
-**Analogi:**
-```
-Class Weight = guru kasih PR lebih banyak ke murid yang lemah
-Focal Loss   = guru fokus ngajarin soal yang susah, skip yang mudah
-```
-
-Tanpa class weight → model anggap enteng Negatif & Positif
-Tanpa focal loss → model buang waktu di artikel Netral yang mudah
-
-✅ **Yang dipakai:** Class weight balanced × 1.5 + Focal Loss gamma=2.0
-❌ **Alternatif:**
-- CE biasa → bias ke Netral
-- Class weight saja → masih buang waktu di artikel mudah
-- Focal loss saja → kelas minoritas masih kurang dapat perhatian
-
-🎤 **Jawab dosen (versi kamu sendiri — sudah bagus!):**
-> *"Kami menggunakan kombinasi class weight dan focal loss untuk mengatasi class imbalance. Class weight memberikan bobot lebih besar pada kelas Negatif dan Positif karena jumlah datanya hampir setengah dari kelas Netral — selisihnya hampir 2x lipat. Sementara focal loss memastikan model tidak membuang waktu pada artikel yang sudah mudah diprediksi, sehingga training lebih fokus pada artikel yang sulit dan ambigu. Kombinasi keduanya memberikan double boost untuk kelas minoritas."*
-
----
-
----
-
-## SESI 7: GRU_LAYERS = 2
-
-**Analogi: 2 tim analis berlapis**
-```
-Layer 1 (Junior) → belajar pola level rendah (kata-kata)
-                   "ada kata korupsi, ada kata pejabat"
-
-Layer 2 (Senior) → belajar pola level tinggi (makna & konteks)
-                   "oh ini kasus hukum serius!" → NEGATIF ✅
-```
-
-**Kenapa tidak 1 atau 3 layer?**
-| Layer | Masalah |
-|---|---|
-| 1 | Kurang dalam, susah tangkap pola kompleks |
-| **2** | **Sweet spot ✅** |
-| 3+ | Overfitting, vanishing gradient |
-
-**Ini bukan fitur GRU doang** — semua neural network bisa di-stack:
-- GRU, LSTM → `num_layers=2`
-- IndoBERT → sudah punya **12 layer Transformer** di dalamnya!
-- "Deep" di Deep Learning = banyak layer ditumpuk
-
-🎤 **Jawab dosen:**
-> *"Dua layer GRU memungkinkan model mempelajari representasi hierarki — layer pertama menangkap pola level kata, layer kedua menangkap pola level makna dan konteks. Lebih dari 2 layer berisiko overfitting untuk dataset 25K."*
-
----
-
-## SESI 8: DROPOUT = 0.2
-
-**Analogi: 512 lampu yang random dimatiin saat training**
-
-```
-TANPA Dropout:
-💡💡💡💡💡💡💡💡💡💡 → semua selalu nyala
-→ tiap neuron spesialisasi 1 hal saja
-→ ketemu kata baru → panik! → OVERFITTING
-
-DENGAN Dropout 0.2:
-Batch 1: 💡💡⬛💡💡⬛💡💡💡⬛ (20% = 102 neuron mati random)
-Batch 2: ⬛💡💡💡⬛💡💡⬛💡💡 (beda lagi yang mati)
-→ semua neuron terpaksa serba bisa
-→ model lebih ROBUST & GENERAL ✅
-```
-
-**Kapan dropout ON/OFF?**
-```
-model.train() → dropout ON  (saat training)
-model.eval()  → dropout OFF (saat evaluasi & predict)
-```
-Trainer ngatur ini otomatis — tidak perlu manual!
-
-**Analogi ON/OFF:**
-```
-Training = latihan pakai rompi berat (dropout ON)
-Test     = pertandingan sungguhan tanpa beban (dropout OFF)
-```
-
-**Kenapa 0.2?**
-| Nilai | Efek |
-|---|---|
-| 0.0 | Tidak ada dropout → overfitting |
-| 0.1 | Terlalu ringan |
-| **0.2** | **Sweet spot untuk BERT-based model ✅** |
-| 0.5 | Terlalu agresif, susah belajar |
-
-**Kalau tidak pakai dropout → model OVERFITTING:**
-```
-Training accuracy  : 95% ← hafal data training
-Validation accuracy: 72% ← jelek di data baru!
-```
-
-✅ **Yang dipakai:** Dropout 0.2
-❌ **Alternatif:** Tidak pakai dropout (overfitting), dropout 0.5 (terlalu agresif)
-
-🎤 **Jawab dosen:**
-> *"Dropout adalah teknik regularisasi yang secara random mematikan 20% neuron saat training. Ini mencegah neuron terlalu bergantung satu sama lain sehingga model dipaksa belajar representasi yang lebih robust. Saat evaluasi, dropout dinonaktifkan otomatis sehingga semua neuron aktif."*
-
----
-
----
-
-## SESI 9: DATA LOADING — Cell 7
-
-```python
-df1 = pd.read_csv(".../cnbc_labeled.csv")
-df2 = pd.read_csv(".../detik_labeled.csv")
-df3 = pd.read_csv(".../kompas_labeled.csv")
-
-df_seed = pd.concat([_select_cols(df1), _select_cols(df2), _select_cols(df3)],
-                     ignore_index=True)
-```
-
-**`_select_cols()`** = pilih 6 kolom yang relevan aja:
-```
-date, title, content, article_id, text, label
-→ kolom lain dibuang, dataframe lebih ringan
-```
-
-**`ignore_index=True`** = reset nomor baris setelah concat:
-```
-TANPA: index duplikat (0,1,2...9998, 0,1,2...5342) ❌
-DENGAN: index berurutan (0, 1, 2, ... 25321) ✅
-```
-
----
-
-## SESI 10: EDA & PREPROCESSING — Cell 9
-
-**4 hal yang dilakukan sekaligus:**
-
-### 1. Visualisasi Distribusi Label
-```
-Bar chart + pie chart → kenalan sama data dulu!
-Konfirmasi class imbalance:
-Netral  : 13.000 (51.3%) ← mayoritas!
-Negatif :  6.322 (24.9%)
-Positif :  5.000 (23.8%)
-```
-
-### 2. Train/Val Split (Stratified)
-```python
-train_df, val_df = train_test_split(
-    df_seed, test_size=0.2,
-    stratify=df_seed['label'],  # ← KUNCI!
-    random_state=SEED
-)
-```
-
-**Kenapa stratify?**
-```
-TANPA: proporsi kelas bisa beda antara train & val → tidak representatif ❌
-DENGAN: proporsi kelas sama persis di train & val ✅
-
-Train : 20.257 artikel (80%)
-Val   :  5.065 artikel (20%)
-```
-
-### 3. Remap Label
-```python
-label_to_id = {-1: 0, 0: 1, 1: 2}
-# PyTorch butuh label mulai dari 0 berurutan
-# Label -1 tidak bisa dihandle PyTorch → ERROR!
-```
-
-### 4. Compute Class Weights
-Sudah dibahas di sesi sebelumnya 😄
-
-🎤 **Jawab dosen:**
-> *"Preprocessing meliputi 4 tahap: EDA untuk konfirmasi class imbalance, stratified split 80:20, remapping label dari -1,0,1 ke 0,1,2 untuk PyTorch, dan menghitung class weights untuk loss function."*
-
----
-
-## SESI 11: TOKENISASI & DATASET — Cell 11
-
-### `attention_mask` — apaan?
-
-Masalah: artikel dalam satu batch harus panjang sama → perlu padding (PAD token).
-Tapi GRU tidak boleh baca PAD → merusak hidden state!
-
-**Solusi: attention_mask**
-```
-attention_mask = 1 → token NYATA, harus dibaca
-attention_mask = 0 → token PAD, SKIP!
-
-Contoh:
-input_ids      : [2983, 1234, 456,  0,   0,   0]
-attention_mask : [  1,    1,   1,   0,   0,   0]
-                  ↑baca  ↑baca ↑baca ↑skip ↑skip
-```
-
-### `padding=False` + `DataCollatorWithPadding`
-
-```
-padding='max_length' (BOROS):
-→ Pad SETIAP artikel ke 512 token selalu
-→ 16 artikel × 512 = 8.192 token per batch 😱
-
-padding=False + DataCollator (HEMAT):
-→ Pad ke panjang terpanjang DALAM BATCH itu aja
-→ Kalau max artikel 12 token → 16 × 12 = 192 token ✅
-→ Hemat VRAM & lebih cepat!
-```
-
-### `return_tensors=None`
-```
-None → tetap list Python dulu (fleksibel)
-'pt' → langsung tensor (susah di-batch karena ukuran beda)
-
-DataLoader yang convert ke tensor setelah tau ukuran batch!
-```
-
-🎤 **Jawab dosen:**
-> *"Kami menggunakan `padding=False` dan `DataCollatorWithPadding` untuk efisiensi memori. Padding hanya dilakukan sampai panjang artikel terpanjang dalam satu batch, bukan sampai MAX_LENGTH 512. Attention mask memberitahu model token mana yang nyata dan mana yang padding."*
-
----
-
----
-
-## SESI 12: ARSITEKTUR MODEL `IndoBertGRU` — Cell 13
-
-### Komponen di `__init__()`:
-
-| Komponen | Kode | Fungsi |
-|---|---|---|
-| **IndoBERT** | `self.bert = AutoModel.from_pretrained(model_name)` | Load 12 layer Transformer. Output: `[batch, seq_len, 768]` |
-| **GRU** | `nn.GRU(input=768, hidden=256, layers=2, bidirectional=True)` | Layer GRU dua arah, 2 layer ditumpuk |
-| **Dropout** | `nn.Dropout(0.2)` | Matiin 20% neuron saat training |
-| **Classifier** | `nn.Linear(512, 3)` | 512 (= 256×2 BiGRU concat) → 3 kelas sentimen |
-
-### Kenapa harus extend `nn.Module`?
-
-Semua model PyTorch wajib extend `nn.Module` — kayak "KTP" biar PyTorch kenal & bisa manage otomatis (`.to(device)`, `.train()`, `.eval()`, hitung gradient, dll).
-
-`super().__init__()` = daftar ke PyTorch dulu sebelum tambahin komponen.
-
-### Alur Data Forward — Step by Step:
-
-```
-Input artikel
-    ↓ Tokenizer
-Token IDs [101, 2983, 1234, ...]
-    ↓ IndoBERT (12 layer Transformer)
-[batch, seq_len, 768]  ← setiap token dapat vektor 768 dimensi
-    ↓ pack_padded_sequence (buang PAD)
-sequence padat
-    ↓ BiGRU (2 arah)
-forward h_n[-2]  +  backward h_n[-1]
-    ↓ torch.cat([h_n[-2], h_n[-1]], dim=1)
-[batch, 512]
-    ↓ Dropout (matiin 20%)
-[batch, 512]
-    ↓ Linear(512→3)
-[batch, 3] = logits
-    ↓ argmax
-[-2.1, 0.3, 4.8] → POSITIF! ✅
-```
-
----
-
-## SESI 13: BATCH × TOKEN × FITUR — Bentuk Tensor
-
-**`[batch, jumlah_token, 768]`** itu maksudnya:
-
-```
-Lapisan 1 = BATCH    → berapa artikel sekaligus (16 artikel/batch)
-Lapisan 2 = TOKEN    → berapa token per artikel (max 512)
-Lapisan 3 = FITUR    → 768 angka per token (dari IndoBERT)
-```
-
-Contoh dengan batch=2 artikel:
-```
-[
-  [  ← Artikel 1
-    [0.2, -0.8, 0.5, ... 768 angka],  ← token "Korupsi"
-    [0.1, -0.3, 0.7, ... 768 angka],  ← token "pejabat"
-  ],
-  [  ← Artikel 2
-    [0.3, -0.1, 0.8, ... 768 angka],  ← token "Presiden"
-    [0.5, -0.4, 0.6, ... 768 angka],  ← token "umumkan"
-  ]
-]
-```
-
-Shape di kode kamu: `[16, 512, 768]` = 16 artikel × max 512 token × 768 dimensi
-
----
-
-## SESI 14: PADDING & ATTENTION MASK
-
-### Masalahnya:
-Artikel dalam satu batch panjangnya beda. Tapi GPU butuh ukuran sama!
-
-```
-Artikel 1: "Korupsi pejabat ditangkap" → 3 token
-Artikel 2: "Presiden umumkan kenaikan gaji karyawan" → 6 token
-```
-
-### Solusi: Padding
-```
-Artikel 1: [korupsi, pejabat, ditangkap, PAD, PAD, PAD]
-Artikel 2: [presiden, umumkan, kenaikan, gaji, karyawan, PAD]
-```
-
-Semua jadi 6 token! ✅
-
-### Tapi GRU ga boleh baca PAD!
-PAD = token kosong, bisa bikin sticky note GRU jadi rusak.
-
-### Solusi: `attention_mask`
-```
-attention_mask = 1 → "token NYATA, harus dibaca!"
-attention_mask = 0 → "token PAD, SKIP!"
-
-Artikel 1:
-input_ids      : [2983, 1234, 456,  0,   0,   0]
-attention_mask : [  1,    1,   1,   0,   0,   0]
-```
-
-### Mengapa PAD ada lalu dibuang lagi?
-- **IndoBERT (GPU paralel)** butuh ukuran sama → harus pakai PAD
-- **GRU (sequential)** ga butuh ukuran sama → buang PAD untuk efisiensi
-
-Solusi: `pack_padded_sequence` — peras artikel, gabungin semua token nyata jadi satu sequence padat, buang PAD.
-
----
-
-## SESI 15: GRU BIDIRECTIONAL & h_n
-
-### `h_n` itu apa?
-**Hidden state TERAKHIR** setelah GRU selesai baca seluruh artikel. Sticky note akhir!
-
-```
-Baca "Korupsi"   → sticky note update
-Baca "pejabat"   → sticky note update
-Baca "ditangkap" → sticky note update
-Baca "KPK"       → sticky note FINAL ← ini h_n!
-```
-
-### Bentuk `h_n`:
-```
-h_n shape: [num_layers × 2, batch, hidden_size]
-         = [2 × 2, batch, 256]
-         = [4, batch, 256]
-```
-
-### Visualisasi sebagai gedung 4 lantai:
-
-```
-┌─────────────────────────────────┐
-│ Lantai 3 = h_n[3] = h_n[-1]     │  ← Layer 2, Backward ✅
-├─────────────────────────────────┤
-│ Lantai 2 = h_n[2] = h_n[-2]     │  ← Layer 2, Forward  ✅
-├─────────────────────────────────┤
-│ Lantai 1 = h_n[1] = h_n[-3]     │  ← Layer 1, Backward
-├─────────────────────────────────┤
-│ Lantai 0 = h_n[0] = h_n[-4]     │  ← Layer 1, Forward
-└─────────────────────────────────┘
-```
-
-### Kenapa `-2` dan `-1`?
-
-Index negatif = hitung dari belakang → **selalu ambil 2 lantai teratas (layer paling dalam)**.
-
-Kalau pakai index positif (2 dan 3) → harus ganti code kalau jumlah layer berubah.
-Kalau pakai negatif (-2 dan -1) → otomatis bener berapapun jumlah layer.
-
-### Forward vs Backward — 2 orang baca artikel:
-
-```
-Artikel: "Meski ekonomi lesu, pertumbuhan akhirnya meningkat pesat"
-
-Orang 1 (Forward, kiri→kanan):
-"awalnya negatif... ada pembalikan... akhirnya positif"
-→ KESIMPULAN FORWARD = h_n[-2]  [256 angka]
-
-Orang 2 (Backward, kanan→kiri):
-"sangat positif... meski awalnya susah... akhirnya berhasil"
-→ KESIMPULAN BACKWARD = h_n[-1]  [256 angka]
-
-Gabung: torch.cat([h_n[-2], h_n[-1]], dim=1) → [batch, 512]
-```
-
-Dua perspektif = pemahaman lebih lengkap! Penting karena kata akhir kalimat sering mempengaruhi makna kata awal.
-
----
-
-## SESI 16: LINEAR LAYER & LOGITS
-
-### `nn.Linear(512, 3)` = perkalian matriks + bias
-
-```
-output = input × W + b
-
-W = matriks bobot [512, 3]  ← 1.536 angka yang dipelajari
-b = bias [3]                 ← 3 angka tambahan
-```
-
-### Cara hitung:
-```
-Skor Negatif = (a1×w1) + (a2×w2) + ... + (a512×w512) + b1
-Skor Netral  = (a1×w3) + (a2×w4) + ... + (a512×w1024) + b2
-Skor Positif = (a1×w5) + (a2×w6) + ... + (a512×w1536) + b3
-
-Hasil: [-2.1, 0.3, 4.8] = logits
-       Neg   Net   Pos
-
-argmax → POSITIF! ✅
-```
-
-### Analogi 512 saksi:
-Bayangin 512 saksi, masing-masing punya bobot kepercayaan berbeda untuk tiap vonis. Setiap saksi vote dengan bobotnya → semua suara dijumlahkan → vonis akhir.
-
-### Output 3 karena 3 kelas:
-Kalau task binary classification → output 2. Kalau 10 kelas → output 10.
-
-### Logits ≠ Probabilitas
-Logits = skor mentah (bisa negatif, bisa > 1). Trainer otomatis apply Softmax saat predict untuk dapat probabilitas.
-
----
-
-## SESI 17: BAGAIMANA INDOBERT "BELAJAR" 768 DIMENSI?
-
-### Tidak ada yang melabeli!
-IndoBERT pakai **Self-Supervised Learning** dengan tugas **Masked Language Modeling (MLM)**.
-
-### Cara kerja MLM:
-```
-Kalimat asli: "Presiden menandatangani keputusan penting"
-
-IndoBERT dikasih: "Presiden [MASK] keputusan penting"
-                              ↑ disembunyikan
-
-IndoBERT harus tebak: "[MASK] = menandatangani"
-```
-
-Salah → koreksi bobot → coba lagi dengan jutaan kalimat lain.
-
-### Data IndoBERT:
-- Wikipedia Bahasa Indonesia
-- Berita online
-- Web crawl teks Indonesia
-- Total: ~4GB teks!
-
-### Hasilnya: representasi otomatis terbentuk
-```
-"korupsi" sering muncul dekat "pejabat", "ditangkap", "KPK"
-→ 768 angkanya jadi mirip dengan kata-kata negatif
-
-"berhasil" sering muncul dekat "pertumbuhan", "meningkat"
-→ 768 angkanya jadi mirip dengan kata-kata positif
-```
-
-### Analogi belajar bahasa asing tanpa kamus:
-```
-Dengar 1000x:
-"Il fait beau aujourd'hui" → orang senyum, pergi keluar
-"Il fait froid aujourd'hui" → orang pakai jaket, menggigil
-
-Tanpa kamus, kamu otomatis tau:
-"beau" = bagus, "froid" = dingin
-```
-
-IndoBERT belajar dari **konteks**, bukan dari label!
-
----
-
-## SESI 18: KLARIFIKASI PENTING — REPRESENTASI vs SENTIMEN
-
-### 768 angka IndoBERT BUKAN label "positif/negatif"!
-
-768 angka = **representasi MAKNA umum**, bukan sentimen!
-
-```
-"korupsi" → [0.2, -0.8, 0.5, ...]
-            ↑ ini cuma bilang: "kata ini terkait tindakan ilegal,
-              pejabat, hukum, uang"
-            ← TIDAK ada info "ini negatif"!
-```
-
-### IndoBERT itu netral:
-Bisa dipake untuk:
-- Sentiment analysis ← skripsimu
-- Ringkasan teks
-- Deteksi hoax
-- Question answering
-- Dll.
-
-### Yang nentuin sentimen = GRU + Classifier (yang KAMU tambah!)
-
-```
-IndoBERT = kamus → "korupsi = tindakan ilegal mengambil uang negara"
-           ← belum tau ini sentimen apa
-
-GRU + Classifier = kamu yang baca & simpulkan
-                    "ada 'korupsi' → ini NEGATIF"
-                    ← di sinilah sentimen ditentukan!
-```
-
-### Konteks-sensitif:
-Kata yang sama bisa punya 768 angka berbeda tergantung kalimatnya!
-```
-"korupsi" di kalimat A → [0.2, -0.8, 0.5, ...]
-"korupsi" di kalimat B → [0.1, -0.6, 0.4, ...]
-                          ↑ beda! Karena konteksnya beda
-```
-
-Inilah kelebihan BERT vs Word2Vec/GloVe — **representasi kontekstual**, bukan fixed embedding.
-
-### 🎤 Jawab dosen:
-> *"IndoBERT menggunakan self-supervised learning dengan Masked Language Modeling pada corpus ~4GB teks Indonesia. Representasi 768 dimensi yang dihasilkan adalah representasi makna kontekstual — bukan label sentimen. Sentimen ditentukan oleh layer downstream (BiGRU + Linear classifier) yang dilatih khusus untuk task klasifikasi sentimen menggunakan dataset berlabel kami."*
-
----
-
----
-
 ## 📚 PROGRESS BELAJAR — DAFTAR ISI SESI
 
-### ✅ Sudah Dipelajari (Sesi 1-18):
+### ✅ Sudah Dipelajari:
 1. Import library (torch, nn, F, Dataset, DataLoader, AutoTokenizer, AutoModel)
 2. SEED=42 & set_seed (reproducibility)
 3. MAX_LENGTH=512 (hard limit BERT)
@@ -954,21 +38,21 @@ Inilah kelebihan BERT vs Word2Vec/GloVe — **representasi kontekstual**, bukan 
 20. Linear layer (matriks × bobot + bias)
 21. IndoBERT belajar via Masked Language Modeling
 22. **KLARIFIKASI**: 768 dimensi = MAKNA bukan SENTIMEN
-
 23. **SESI 19**: Kenapa BERT di CPU untuk XGBoost pipeline
 24. **SESI 20**: Debug OOM notebook XGBoost (reuse embeddings + memory cleanup)
+25. **SESI 21**: Proses labeling dataset — reverse engineering & metodologi
+26. **SESI 22**: Semi-supervised labeling pipeline (TF-IDF + LR dari contoh manual)
+27. **SESI 23**: Scoreboard final 7 model + analisis BiLSTM overfitting
 
 ### ⏳ Belum Dibahas (Next Session):
-- Cell 14-15: FocalLossTrainer & compute_metrics
-- Cell 16-17: TrainingArguments detail (14 parameter)
-- Cell 18: `trainer.train()` — apa yang terjadi di balik layar
-- Cell 20-21: Evaluasi, classification_report, save model
-- Cell 22-23: PySastrawi, Confusion matrix, Word Cloud
-- Ablation Study (3 ablasi)
-- K-Fold CV (StratifiedKFold)
-- XAI dengan Captum (Integrated Gradients)
-- Statistical Testing (Bootstrap CI + McNemar)
-- Save predictions untuk McNemar di notebook lain
+- FocalLossTrainer & compute_metrics detail
+- TrainingArguments (14 parameter + justifikasi)
+- `trainer.train()` — apa yang terjadi di balik layar
+- Ablation Study — semua cell masih di-comment, perlu dirun
+- K-Fold CV — semua cell masih di-comment, perlu dirun
+- XAI (Integrated Gradients DL, SHAP XGBoost/RFC) — perlu dirun
+- Statistical Testing (Bootstrap CI + McNemar) — perlu dirun
+- Paper update: isi placeholder K-Fold, McNemar, Efficiency setelah dirun
 
 ---
 
@@ -994,96 +78,144 @@ Tahap 2: XGBoost → training classifier (butuh banyak iterasi)
 
 ### Kenapa tidak bisa keduanya GPU sekaligus?
 
-PyTorch (untuk BERT) dan XGBoost GPU backend sama-sama pakai CUDA, tapi **memory management-nya sendiri-sendiri**. Kalau dijalankan bersamaan di GPU yang sama:
-- Bisa konflik alokasi memori CUDA
-- Bisa crash OOM
-- Bisa ada bug yang susah di-debug
+PyTorch (untuk BERT) dan XGBoost GPU backend sama-sama pakai CUDA, tapi **memory management-nya sendiri-sendiri**. Kalau dijalankan bersamaan di GPU yang sama bisa konflik alokasi memori CUDA → crash.
 
 ### Trade-off yang masuk akal:
 
 | | IndoBERT | XGBoost |
 |---|---|---|
 | Mode | Inference (tidak ditraining!) | Training (ribuan iterasi) |
-| Dilakukan | Sekali saja, hasil disimpan | Berkali-kali sampai konvergen |
-| Device | CPU → aman, cukup | GPU → perlu parallelism! |
-| Keuntungan GPU | Kecil (inference sudah cukup cepat) | Besar (tree building sangat paralel) |
-
-**Analogi:** Kamu fotokopi dokumen (BERT extract embeddings) di mesin yang biasa — tidak perlu mesin canggih karena cukup dilakukan sekali. Mesin canggih (GPU) lebih berguna untuk proses berikutnya yang berulang-ulang (XGBoost training).
+| Dilakukan | Sekali saja | Berkali-kali sampai konvergen |
+| Device | CPU → aman | GPU → perlu parallelism! |
 
 🎤 **Jawab dosen:**
-> *"Pada pipeline IndoBERT + XGBoost, IndoBERT dijalankan di CPU untuk feature extraction karena prosesnya hanya inference satu kali dan tidak memerlukan GPU. GPU dialokasikan penuh untuk XGBoost training yang membutuhkan paralelisme tinggi via CUDA backend, sehingga menghindari konflik alokasi memori CUDA antara dua framework yang berbeda."*
+> *"Pada pipeline IndoBERT + XGBoost, IndoBERT dijalankan di CPU untuk feature extraction karena prosesnya hanya inference satu kali. GPU dialokasikan penuh untuk XGBoost training yang membutuhkan paralelisme tinggi via CUDA backend, menghindari konflik alokasi memori CUDA antara dua framework."*
 
 ---
 
 ## SESI 20: DEBUG OOM NOTEBOOK XGBOOST
 
-### Masalah yang terjadi:
-Kernel Kaggle crash dengan error: **"Your notebook tried to allocate more memory than is available."**
+### Root Cause:
+Notebook XGBoost punya **14 model ditraining sekaligus** (1 utama + 8 ablasi + 5 K-Fold) tanpa cleanup memori antara model. Ditambah ekstraksi embedding dilakukan berulang.
 
-### Detektif: cari penyebabnya
+### Fixes yang dilakukan:
+1. **Ablation cells**: ganti `device='cuda'` → `device='cpu'` + `del model; gc.collect()` per iterasi
+2. **K-Fold**: reuse `np.vstack([X_train, X_val])` bukan ekstrak ulang
+3. **Setelah ekstraksi**: `del bert_model; gc.collect()` — bebaskan 430MB
+4. **Sementara**: comment semua reviewer cells → save model dulu → uncomment nanti
 
-Setelah baca notebook, ditemukan **2 pemborosan memori**:
+### Pelajaran:
+XGBoost tidak pakai HuggingFace Trainer → memory management **harus manual** berbeda dengan GRU/CNN yang otomatis diurus Trainer.
 
-**Pemborosan 1 — Cell 21 (Ablation 1): array tidak dihapus setelah selesai**
+---
+
+## SESI 21: PROSES LABELING DATASET
+
+### Flow Asli (Reverse Engineered dari Code di Repo):
+
 ```
-Setelah ablation mean pooling selesai, masih ada di memori:
-X_train_mean  (~59 MB)   ← tidak dipakai lagi
-X_val_mean    (~15 MB)   ← tidak dipakai lagi
-X_train_mean_s (~59 MB) ← tidak dipakai lagi
-X_val_mean_s  (~15 MB)  ← tidak dipakai lagi
-= ~148 MB nganggur!
+RAW DATA (scraping BeautifulSoup)
+CNBC: 5,343 | Detik: 9,999 | Kompas: 9,980
+        ↓
+CLEANING (remove duplikat, boilerplate, artikel pendek)
+        ↓
+SAMPLING SEED (random seed=42)
+~800 artikel per portal = ~2,400 total
+        ↓
+KEYWORD-ASSISTED PRE-LABELING
+Script kasih 'label_suggest' berdasarkan:
+- POS_KW: apresiasi, tumbuh, kondusif, berhasil...
+- NEG_KW: korupsi, tersangka, anjlok, gagal...
+        ↓
+MANUAL REVIEW oleh tim (isi Excel)
+~2,400 artikel dilabeli manual dengan panduan keyword
+        ↓
+AUTO-LABEL SISA ARTIKEL
+TF-IDF + Logistic Regression belajar dari 2,400 contoh
+→ prediksi label 22,900 artikel sisanya
+        ↓
+DATASET FINAL BERLABEL: 25,322 artikel
 ```
 
-**Pemborosan 2 — Cell 27 (K-Fold): ekstrak ulang embeddings yang sudah ada!**
-```
-X_train + X_val sudah di memori (dari cell 13)
-→ Cell 27 ekstrak ulang semua 25K artikel lagi → buang-buang RAM + waktu!
+### File bukti ada di repo (`DATASET guide/`):
+- `Step 2`: sampling scripts + keyword lexicon
+- `Step 3`: Excel hasil labeling manual tim
+- `Step 3.5`: `auto_label_from_examples.ipynb` (TF-IDF + LR)
+- `Step 6`: dataset final
 
-Padahal:
-X_train (80%) + X_val (20%) = X_all (100%) ← np.vstack saja!
-```
+🎤 **Jawab dosen soal labeling:**
+> *"Proses anotasi menggunakan pendekatan semi-supervised. Pertama, kami sampling ~800 artikel per portal (seed=42) dan menggunakan keyword-assisted pre-labeling sebagai panduan — sistem memberikan saran label berdasarkan lexicon sentimen domain-spesifik. Tim kemudian mereview dan memfinalisasi label secara manual (~2,400 artikel). Selanjutnya, TF-IDF + Logistic Regression dilatih dari contoh manual tersebut untuk memprediksi label 22,900 artikel sisanya. Dataset final 25,322 artikel adalah gabungan label manual dan prediksi."*
 
-Plus bert_model (~430 MB) masih di memori padahal sudah tidak dipakai lagi setelah semua ekstraksi selesai.
+🎤 **Kalau ditanya 'kenapa tidak label semua manual?':**
+> *"Melabeli 25,322 artikel secara fully manual tidak feasible dari sisi waktu dan sumber daya. Pendekatan semi-supervised ini adalah praktik standar dalam NLP research untuk dataset berskala besar."*
 
-### Fix yang diterapkan:
+---
 
-**Fix 1 — Akhir cell 21, tambah cleanup:**
+## SESI 22: SEMI-SUPERVISED LABELING PIPELINE
+
+### Cara Kerja `auto_label_from_examples.ipynb`:
+
+**Step 1 — TF-IDF Vectorization:**
+Ubah teks menjadi vektor numerik berdasarkan frekuensi kata.
+- `max_features=20,000`: pakai 20K kata paling penting
+- `ngram_range=(1,2)`: unigram + bigram ("korupsi", "tidak korupsi")
+- Hasilnya: setiap artikel jadi vektor 20K dimensi
+
+**Step 2 — Logistic Regression belajar dari contoh manual:**
 ```python
-del X_train_mean, X_val_mean, X_train_mean_s, X_val_mean_s, xgb_mean
-import gc; gc.collect()
-print("✅ Ablation 1 memory freed")
+clf.fit(X_manual, y_manual)
+# X_manual = TF-IDF dari 2,400 artikel berlabel manual
+# y_manual = label -1/0/1 yang tim isi
 ```
+Model belajar: "kombinasi kata apa yang cenderung → label apa?"
 
-**Fix 2 — Awal cell 27, ganti ekstraksi dengan reuse:**
+**Step 3 — Predict sisa artikel:**
 ```python
-# SEBELUM (boros):
-X_all_kf = extract_embeddings(texts=df_seed['text'].tolist(), ...)  # ekstrak 25K lagi!
-
-# SESUDAH (efisien):
-X_all_kf = np.vstack([X_train, X_val])       # sudah ada, tinggal gabung!
-all_labels_kf = np.concatenate([y_train, y_val])
-
-del bert_model  # bebaskan 430 MB
-gc.collect()
-torch.cuda.empty_cache()
+df_unlabeled['label'] = clf.predict(X_unlabeled)
 ```
 
-### Apakah hasilnya berubah? TIDAK!
+### Kenapa TF-IDF + Logistic Regression, bukan IndoBERT?
+- **Interpretable**: bisa lihat kata paling berpengaruh per kelas
+- **Reproducible**: deterministik
+- **Fully grounded in manual labels**: murni belajar dari contoh manusia
+- **No AI/LLM**: murni statistik
 
-```
-X_train = 80% data (20.257 artikel) → sudah diekstrak
-X_val   = 20% data ( 5.065 artikel) → sudah diekstrak
-np.vstack = 100% data (25.322 artikel) ← SAMA PERSIS dengan ekstrak ulang
-```
+---
 
-Ibaratnya: kamu sudah punya fotokopi halaman 1-80 dan 81-100. Tidak perlu fotokopi ulang semua 100 halaman — tinggal disatukan!
+## SESI 23: SCOREBOARD FINAL + ANALISIS BILSTM
 
-### Pelajaran untuk sidang:
+### Scoreboard 7 Model:
 
-Kalau dosen tanya *"kenapa implementasinya begini?"*:
-> *"Untuk efisiensi memori, embeddings yang sudah diekstrak pada tahap train-val split digunakan kembali untuk K-Fold dengan menggabungkan array menggunakan np.vstack. Ini menghindari redundant extraction yang menyebabkan out-of-memory error, sambil menghasilkan hasil yang identik secara matematis."*
+| Model | Macro F1 | Accuracy |
+|---|---|---|
+| IndoBERT Fine-Tuned | 82.85% 🥇 | 83.81% |
+| IndoBERT + CNN | 82.55% 🥈 | 83.55% |
+| IndoBERT + GRU | 82.45% 🥉 | 83.51% |
+| IndoBERT + BiLSTM | 76.56% | 77.93% |
+| IndoBERT + XGBoost | 68.28% | 70.64% |
+| IndoBERT + RFC | 63.27% | 70.33% |
+| IndoBERT Base (Frozen) | 35.80% | 37.93% |
+
+### Analisis BiLSTM (Epoch Training):
+BiLSTM training loss terus turun (7.49 → epoch 15) tapi validation loss terus **naik** dari epoch 3 (0.29 → 0.91) → **classic overfitting**.
+
+**Kenapa BiLSTM overfitting lebih parah dari GRU?**
+- LSTM punya **4 gate** (input, forget, cell, output) vs GRU **3 gate** (update, reset, hidden)
+- Parameter LSTM lebih banyak → lebih mudah hafal training data
+- Pada 25K dataset, GRU cukup dan lebih efisien
+
+🎤 **Jawab dosen:**
+> *"BiLSTM menunjukkan tanda overfitting — validation loss terus meningkat dari epoch 3 meskipun training loss turun. Ini konsisten dengan teori bahwa LSTM dengan 4 gate memiliki lebih banyak parameter dibanding GRU dengan 3 gate, sehingga lebih rentan overfitting pada dataset medium-size 25K artikel."*
+
+### Insight Penting — IndoBERT Base vs Fine-Tuned:
+- Base Frozen: 35.80% — hampir random (3-class random = 33%)
+- Fine-Tuned: 82.85%
+- Gap: **57%** — membuktikan fine-tuning SANGAT penting!
+
+🎤 **Jawab dosen:**
+> *"Perbandingan antara IndoBERT Base (frozen, 35.80%) dengan IndoBERT Fine-Tuned (82.85%) memberikan bukti empiris tentang pentingnya task-specific fine-tuning. Model frozen hanya mengandalkan representasi general IndoBERT tanpa adaptasi ke domain sentimen politik, menghasilkan performa hampir setara random baseline."*
 
 ---
 
 *Dokumen materi pembelajaran. Untuk progress skripsi & status model lihat CLAUDE.md.*
-*Last updated: 3 Juni 2026*
+*Last updated: 5 Juni 2026*
